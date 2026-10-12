@@ -321,6 +321,18 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
 .rank .nm span{font-size:12px;color:var(--muted)}
 .rank .lvv{font:900 17px var(--f-round);font-variant-numeric:tabular-nums;color:var(--navy)}
 .empty{background:#ffffff88;border-radius:16px;padding:16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px}
+/* 友だち対戦（別の端末） */
+.vschoice{display:grid;gap:10px}
+.vscode{font:900 40px var(--f-round);letter-spacing:.18em;text-align:center;color:var(--navy);background:var(--card);border-radius:18px;padding:10px 8px 6px;box-shadow:0 4px 14px #2b2f5514;font-variant-numeric:tabular-nums}
+.vscode small{display:block;font-size:12px;letter-spacing:0;color:var(--muted);font-weight:800}
+.vspair{display:grid;gap:8px}
+.vspair .who{font-weight:900;font-size:13px;color:var(--muted);margin:0 0 -4px 4px}
+.vswait{background:#ffffff99;border-radius:18px;padding:18px;text-align:center;font-weight:800;color:var(--muted);font-size:14px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.vswait .dots3{display:flex;gap:6px}
+.vswait .dots3 i{width:9px;height:9px;border-radius:50%;background:var(--navy);animation:bob 1s ease-in-out infinite}
+.vswait .dots3 i:nth-child(2){animation-delay:.15s}.vswait .dots3 i:nth-child(3){animation-delay:.3s}
+@keyframes bob{50%{transform:translateY(-6px);opacity:.4}}
+.vsbanner{background:#fff3e0;border-radius:14px;padding:10px 14px;font-weight:800;font-size:13.5px;color:#8a4b00;display:flex;flex-direction:column;gap:8px}
 /* おなかいっぱい・共有 */
 .fullcard{background:var(--card);border-radius:20px;padding:16px;box-shadow:0 4px 14px #2b2f5514;display:flex;flex-direction:column;gap:10px;text-align:center;align-items:stretch}
 .fullcard b{font-weight:900;font-size:18px}
@@ -481,7 +493,7 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
       <div class="bar"><button class="back" data-home>← ホーム</button><h2>バトルの準備</h2></div>
       <div class="mode" role="radiogroup" aria-label="対戦相手">
         <button role="radio" id="modeCpu" aria-checked="true">ひとりで（CPUと）</button>
-        <button role="radio" id="mode2p" aria-checked="false">ふたりで</button>
+        <button role="radio" id="mode2p" aria-checked="false">友だちと（別のスマホ）</button>
       </div>
       <div class="todo" id="prepTodo"></div>
       <div id="prepBody"></div>
@@ -501,6 +513,7 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
         <ol class="log" id="log" aria-live="polite"></ol>
       </div>
       <div id="batDial"></div>
+      <div class="vsbanner" id="vsBanner" hidden></div>
       <div class="todo" id="batTodo"></div>
       <div id="batCtl"></div>
     </section>
@@ -613,7 +626,7 @@ const AUTH_ERR=(()=>{try{const q=new URLSearchParams(location.search),hs=new URL
 /* URLの後ろに /rest/v1/ などが付いていても動くように、プロジェクトのURLだけにそろえる */
 const SB_URL=String(CONFIG.SUPABASE_URL).trim().replace(/\/(rest|auth)\/v1.*$/,'').replace(/\/+$/,'');
 const sb=ONLINE?window.supabase.createClient(SB_URL,CONFIG.SUPABASE_ANON_KEY.trim(),{auth:{flowType:'pkce',detectSessionInUrl:true,persistSession:true}}):null;
-const SYNC_KEYS=['ba-player','ba-units','ba-record','ba-found','ba-meal','ba-tut'];
+const SYNC_KEYS=['ba-player','ba-units','ba-record','ba-found','ba-meal','ba-tut','ba-vsrec'];
 const net={ready:false,needWelcome:false,welcomeMode:'start',uid:null,me:null,user:null,offline:false,incoming:0};
 let applying=false,syncT=null;
 function markDirty(){if(applying)return;try{localStorage.setItem('ba-dirty-at',String(Date.now()))}catch{}if(ONLINE&&net.ready){clearTimeout(syncT);syncT=setTimeout(()=>{syncT=null;pushSave()},1500)}}
@@ -972,6 +985,7 @@ $$('[data-home]').forEach(b=>b.onclick=()=>home());
 
 /* ---------- HOME ---------- */
 function home(){
+  vsLeave();
   if(ONLINE&&net.needWelcome){showWelcome();return}
   const ms=mates(),max=slotCount(player.lv),ns=nextSlotLv(player.lv);
   $('#playerCard').innerHTML=`<div class="top"><span class="plv">プレイヤー Lv.${player.lv}</span><span>仲間 ${ms.length}/${max}人</span></div>
@@ -988,7 +1002,7 @@ function home(){
     btn('amber','＋','仲間をつくる','商品のバーコードを撮るだけ',()=>startCreate());
   }else{
     todo($('#homeTodo'),'仲間のバーコードの商品を手元に用意して、バトルしよう！','バトルでは、その商品のバーコードをもう一度撮って仲間を呼び出します。');
-    btn('','▶','バトルする','仲間を呼び出してCPUや友だちと戦う',()=>startPrep());
+    btn('','▶','バトルする','CPUや、別のスマホの友だちと戦う',()=>startPrep());
     btn('amber','＋','仲間をつくる',ms.length<max?`あと${max-ms.length}人つくれる`:'いっぱいなので、だれかと入れかえ',()=>startCreate());
     if(isBonusDay())menu.append(h(`<div class="bonusbar"><span class="btag">ボーナス日</span><div>今日は1人${MEAL_BONUS}枚まで食べさせられる！<small>ふだんは1日${MEAL_BASE}枚まで。ボーナス日はときどきやってくる</small></div></div>`));
     btn('blue','↑','仲間を育てる',isBonusDay()?`今日はボーナス日！ 1人${MEAL_BONUS}枚まで食べさせられる`:`商品を食べさせて強くする（1人1日${MEAL_BASE}枚まで）`,()=>startFeed());
@@ -1155,17 +1169,25 @@ $('#crBack').onclick=()=>{
 
 /* ---------- BATTLE PREP ---------- */
 const prep={mode:'cpu',u:[null,null]};
-function setMode(m){prep.mode=m;$('#modeCpu').setAttribute('aria-checked',m==='cpu');$('#mode2p').setAttribute('aria-checked',m==='2p');prep.u[1]=null;renderPrep()}
+function setMode(m){if(prep.mode!==m)vsLeave();prep.mode=m;$('#modeCpu').setAttribute('aria-checked',m==='cpu');$('#mode2p').setAttribute('aria-checked',m==='net');prep.u[1]=null;renderPrep()}
 $('#modeCpu').onclick=()=>setMode('cpu');
-$('#mode2p').onclick=()=>setMode('2p');
-function startPrep(){
+$('#mode2p').onclick=()=>setMode('net');
+function startPrep(mode){
   if(!mates().length){startCreate();return}
-  prep.u=[null,null];renderPrep();go('prep');
+  if(mode)prep.mode=mode;
+  $('#modeCpu').setAttribute('aria-checked',prep.mode==='cpu');$('#mode2p').setAttribute('aria-checked',prep.mode==='net');
+  if(!vs.ch)prep.u=[null,null];
+  renderPrep();go('prep');
 }
 function renderPrep(){
   const body=$('#prepBody');body.innerHTML='';const T=$('#prepTodo');
+  if(prep.mode==='net'&&!ONLINE){
+    todo(T,'友だちとの対戦は、サーバーにつないで遊ぶと使えます','おたがいのスマホやタブレットで、同じゲームを開いて対戦します。');
+    if(SERVER){const b=h('<button class="big center">サーバーにつなぐ</button>');b.onclick=()=>{try{localStorage.removeItem('ba-mode')}catch{}location.replace(RETURN_URL)};body.append(b)}
+    return;
+  }
   if(!prep.u[0]){
-    todo(T,'あなたの仲間の商品のバーコードを撮って、呼び出してください','どの商品だったかは下のリストを見てね。');
+    todo(T,'あなたの仲間の商品のバーコードを撮って、呼び出してください',prep.mode==='net'&&prep.joinCode?`呼び出したら、あいことば「${esc(prep.joinCode)}」の部屋に入ります。`:'どの商品だったかは下のリストを見てね。');
     const sc=scanner({label:'仲間のバーコードを撮る',sub:'カメラが開きます',onCode:code=>{
       const k=findUnit(code);
       if(k<0)return'この商品はまだ仲間になっていません。下のリストの商品を撮ってね（新しく仲間にするならホームの「仲間をつくる」から）';
@@ -1176,25 +1198,16 @@ function renderPrep(){
     const ul=h('<ul class="list"></ul>');mates().forEach(({u})=>ul.append(mateRow(u)));body.append(ul);
     return;
   }
-  body.append(sticker(prep.u[0].code),cardEl(fighter(prep.u[0])));
+  if(prep.mode==='cpu'||!vs.ch)body.append(sticker(prep.u[0].code),cardEl(fighter(prep.u[0])));
   if(prep.mode==='cpu'){
     todo(T,`${esc(prep.u[0].name)}を呼び出した！ 準備OKならバトル開始`,'相手はCPUが選んだ、同じくらいの強さのキャラです。');
     const go_=h('<button class="big center">バトル開始！</button>');
     go_.onclick=()=>{let c;do{c=randomJan()}while(c===prep.u[0].code);prep.u[1]=strayUnit(c);startBattle()};
     body.append(go_);
-  }else if(!prep.u[1]){
-    todo(T,'つぎは相手の番。相手の仲間か、好きな商品のバーコードを撮ってください','相手の仲間がいない場合は、どんな商品でも野良キャラとして戦えます。');
-    const sc=scanner({label:'相手のバーコードを撮る',color:'blue',sub:'スマホを相手にわたしてね',trial:true,onCode:code=>{
-      if(code===prep.u[0].code)return'あなたと同じ商品です。別の商品にしてね';
-      const k=findUnit(code);prep.u[1]=k>=0?units[k]:strayUnit(code);beep();sc.setOff(true);setTimeout(renderPrep,scanDelay());return null;
-    }});
-    body.append(sc);
   }else{
-    todo(T,'両方そろった！ バトル開始');
-    body.append(cardEl(fighter(prep.u[1])));
-    const go_=h('<button class="big center">バトル開始！</button>');go_.onclick=startBattle;body.append(go_);
+    renderVsLobby(body,T);
   }
-  const re=h('<button class="sub">呼び出しをやり直す</button>');re.onclick=()=>{prep.u=[null,null];renderPrep()};body.append(re);
+  const re=h('<button class="sub">呼び出しをやり直す</button>');re.onclick=()=>{vsLeave();prep.u=[null,null];renderPrep()};body.append(re);
 }
 
 /* ---------- actions from barcodes ---------- */
@@ -1218,13 +1231,13 @@ function makeMove(code,A){
 
 /* ---------- BATTLE ---------- */
 const F=[];
-const bs={mode:'cpu',busy:false,turn:0,over:false,logs:[],used:new Set()};
-const label=i=>bs.mode==='cpu'?(i?'CPU':'あなた'):(i?'ふたり目':'ひとり目');
+const bs={mode:'cpu',host:true,busy:false,anim:false,turn:0,turnNo:0,over:false,logs:[],used:new Set()};
+const label=i=>bs.mode==='cpu'?(i?'CPU':'あなた'):(i?'あいて':'あなた');
 let bScan;
 function buildBatCtl(){
   const c=$('#batCtl');c.innerHTML='';
   bScan=scanner({label:'商品のバーコードを撮って攻撃！',sub:'仲間の商品以外なら何でもOK',trial:true,onCode:code=>{
-    if(bs.busy||bs.over||(bs.mode==='cpu'&&bs.turn===1))return'いまは相手の番です。ちょっと待ってね';
+    if(bs.busy||bs.over||bs.turn!==0)return'いまは相手の番です。ちょっと待ってね';
     if(code===F[0].code||code===F[1].code)return'それは仲間を呼び出すバーコードなので、攻撃には使えません。ほかの商品を撮ってね';
     openConfirm(code);return null;
   }});
@@ -1305,16 +1318,16 @@ function refresh(){
   });
 }
 function setPanel(){
-  const mine=!bs.busy&&!bs.over&&!(bs.mode==='cpu'&&bs.turn===1);
+  const mine=!bs.busy&&!bs.over&&bs.turn===0;
   bScan.setOff(!mine);$('#basicBtn').disabled=!mine;
   const T=$('#batTodo');
   if(bs.over)return;
   if(mine){
     const me=F[bs.turn],L=luckyOf(me.code),hpLow=me.hp<me.maxHp*.4;
-    todo(T,`${bs.mode==='cpu'?'あなた':label(bs.turn)}の番！ 商品のバーコードを撮って技を出そう`,
+    todo(T,'あなたの番！ 商品のバーコードを撮って技を出そう',
       `上の早見表のとおり、技はバーコードの<b>最後の数字</b>で決まります。${hpLow?'体力が少ないので、最後が5か6の商品で回復するのもあり。':`${esc(me.name)}のラッキー数字は ${L}。`}強い商品は何回使ってもOK。`);
     bScan.show('');bs.dial?.setOn(null);
-  }else todo(T,bs.mode==='cpu'&&bs.turn===1?'相手（CPU）の番です。ちょっと待ってね':'技が出ています…');
+  }else todo(T,bs.turn===1&&!bs.busy?(bs.mode==='net'?`あいて（${esc(F[1].name)}）の番です`:'相手（CPU）の番です。ちょっと待ってね'):bs.turn===1&&bs.mode==='cpu'?'相手（CPU）の番です。ちょっと待ってね':bs.mode==='net'&&!bs.host&&bs.sending?'あいてのスマホに送っています…':'技が出ています…',bs.turn===1&&bs.mode==='net'&&!bs.busy?'あいてがバーコードを撮るのを待っています。あいてのスマホでも同じバトルが見えています。':'');
 }
 function pop(i,text){
   const box=$('#f'+i),s=document.createElement('div');s.className='pop';s.textContent=text;box.append(s);
@@ -1360,21 +1373,25 @@ async function turnStart(i){
   const f=F[i];f.guard=false;
   if(f.jobKey==='priest'&&f.hp<f.maxHp){const x=heal(i,f.maxHp*.04);if(x){log(`${f.name}の祈りで体力が${x}回復`);await wait(450)}}
 }
+function discoverMove(act){
+  if(!act.rd)return;const rd=act.rd;
+  if(rd.kind!=='atk')discover(rd.kind);
+  if(rd.stars===3)setTimeout(()=>discover('star3'),900);
+  if(rd.luckyHit)setTimeout(()=>discover('lucky'),1800);
+  if(act.kind==='magic')discover('book');
+}
+const basicMove=()=>({kind:'basic',name:'素手攻撃',desc:'撮らずに攻撃。弱め',rank:''});
 async function doTurn(a,code){
-  if(bs.over)return;
-  bs.busy=true;setPanel();
+  if(bs.over||bs.anim)return;
+  if(bs.mode==='net'&&!bs.host){vsSendMove(code);return}
+  bs.anim=true;bs.busy=true;setPanel();
   const A=F[a],d=1-a,D=F[d];
   let act;
   if(code){bs.used.add(code);act=makeMove(code,A);beep()}
-  else act={kind:'basic',name:'素手攻撃',desc:'撮らずに攻撃。弱め',rank:''};
+  else act=basicMove();
+  if(bs.mode==='net')vsSend({t:'act',to:bs.peerSid,bid:bs.bid,turnNo:bs.turnNo,a,code:code||null});
   showAct(act,label(a));
-  if(act.rd&&!(bs.mode==='cpu'&&a===1)){
-    const rd=act.rd;
-    if(rd.kind!=='atk')discover(rd.kind);
-    if(rd.stars===3)setTimeout(()=>discover('star3'),900);
-    if(rd.luckyHit)setTimeout(()=>discover('lucky'),1800);
-    if(act.kind==='magic')discover('book');
-  }
+  if(a===0)discoverMove(act);
   log(`${A.name}の${act.name}！`);
   const before={ah:A.hp,dh:D.hp,ast:A.st,dst:D.st,adf:A.df};
   await wait(800);
@@ -1400,10 +1417,12 @@ async function doTurn(a,code){
       }}
   }
   showResult(a,act,before);
-  if(D.hp<=0){D.hp=0;finish(a);return}
+  if(D.hp<=0){D.hp=0;bs.anim=false;finish(a);return}
   if(bs.mode==='cpu'&&a===0)await wait(900);
-  bs.turn=d;refresh();
+  bs.turn=d;bs.turnNo++;refresh();
   await turnStart(d);refresh();
+  bs.anim=false;
+  if(bs.mode==='net')vsSendState();
   if(bs.mode==='cpu'&&d===1){
     setPanel();
     await wait(1400);
@@ -1429,7 +1448,7 @@ function showResult(a,act,b){
 }
 async function finish(w){
   bs.over=true;bs.busy=false;refresh();
-  log(`${F[1-w].name}はたおれた…`);
+  {const t=`${F[1-w].name}はたおれた…`;if(bs.logs.at(-1)!==t)log(t)}
   bScan.setOff(true);$('#basicBtn').disabled=true;
   todo($('#batTodo'),'勝負あり！');
   let exp,title,line;
@@ -1438,11 +1457,18 @@ async function finish(w){
     exp=w===0?40+4*F[1].lv:15;title=w===0?'YOU WIN!':'YOU LOSE…';
     line=w===0?`${F[0].name}の勝ち！`:'負けちゃった… 仲間を育てるか、最後の数字を見て商品を選んでまた挑戦しよう';
     line+=`（CPU戦 ${r.w}勝 ${r.l}敗）`;
-  }else{exp=20;title=`${label(w)}の勝ち！`;line=`${F[w].name}の勝ち！`}
+  }else{
+    if(bs.host)vsSendState();
+    const r=store.get('ba-vsrec',{w:0,l:0});w===0?r.w++:r.l++;store.set('ba-vsrec',r);
+    exp=w===0?30+3*F[1].lv:15;title=w===0?'YOU WIN!':'YOU LOSE…';
+    line=w===0?`${F[0].name}の勝ち！ ${F[1].name}をたおした`:`${F[1].name}の勝ち… 仲間を育てて、またいどもう`;
+    line+=`（友だち対戦 ${r.w}勝 ${r.l}敗）`;
+  }
   const msgs=gainExp(exp);
   await wait(1200);
-  $('#resBody').classList.toggle('lose',bs.mode==='cpu'&&w!==0);
-  $('#resBody').innerHTML=`<div class="rt">${title}</div><p>${esc(line)}</p><p>経験値を${exp}もらった</p>${msgs.map(m=>`<p><b>${m}</b></p>`).join('')}${bs.mode==='cpu'&&w!==0?'<button class="link" id="resMan">勝ち方のヒント：たたかい方マニュアル</button>':''}`;
+  $('#resBody').classList.toggle('lose',w!==0);
+  $('#resAgain').textContent=bs.mode==='net'?'同じあいてと、もう一度':'同じ仲間でもう一度';
+  $('#resBody').innerHTML=`<div class="rt">${title}</div><p>${esc(line)}</p><p>経験値を${exp}もらった</p>${msgs.map(m=>`<p><b>${m}</b></p>`).join('')}${w!==0?'<button class="link" id="resMan">勝ち方のヒント：たたかい方マニュアル</button>':''}`;
   $('#resMan')&&($('#resMan').onclick=()=>startManual());
   if(msgs.length)fanfare();
   go('result');
@@ -1454,11 +1480,17 @@ function cpuLevelUp(f,lv){
 function prepF(src){return{...src,hp:src.maxHp,baseSt:src.st,guard:false}}
 function startBattle(){
   const fresh=u=>{const k=findUnit(u.code);return k>=0?units[k]:u};
-  prep.u=prep.u.map(fresh);
-  bs.mode=prep.mode;
+  prep.u[0]=fresh(prep.u[0]);
+  bs.mode=prep.mode==='net'?'net':'cpu';bs.host=true;
+  if(bs.mode==='net'){
+    const peer=vsPeer();if(!peer||!peer.f)return renderPrep();
+    prep.u[1]=sumToUnit(peer.f);if(!prep.u[1])return renderPrep();
+  }
+  if(bs.mode==='net'){bs.peerSid=vsPeer().sid;bs.bid=vs.sid+'-'+Date.now().toString(36)}
   F[0]=prepF(fighter(prep.u[0]));F[1]=prepF(fighter(prep.u[1]));
   if(bs.mode==='cpu'&&F[1].lv<F[0].lv){cpuLevelUp(F[1],F[0].lv);F[1].baseSt=F[1].st}
-  Object.assign(bs,{over:false,busy:false,logs:[],used:new Set([F[0].code,F[1].code])});
+  Object.assign(bs,{over:false,busy:false,anim:false,turnNo:1,logs:[],used:new Set([F[0].code,F[1].code])});
+  $('#vsBanner').hidden=true;
   buildBatCtl();$('#actCard').hidden=true;
   bs.dial=dialEl('battle');$('#batDial').replaceChildren(bs.dial);
   go('battle');
@@ -1468,12 +1500,216 @@ function startBattle(){
   log(`${F[0].name} VS ${F[1].name}`);
   log(`先に動くのは${label(bs.turn)}！`);
   refresh();
+  if(bs.mode==='net')vsSendState(true);
   if(bs.mode==='cpu'&&bs.turn===1){
     bs.busy=true;setPanel();
     wait(1200).then(()=>{let c;do{c=randomJan()}while(bs.used.has(c));doTurn(1,c)});
   }else setPanel();
 }
-$('#resAgain').onclick=startBattle;
+$('#resAgain').onclick=()=>{if(prep.mode==='net'&&bs.mode==='net'){startPrep('net')}else startBattle()};
+
+/* ---------- 友だち対戦（別のスマホ・タブレット） ----------
+   しくみ：部屋をつくった人（ホスト）のスマホがバトルの計算をして、結果をあいてのスマホに送る。
+   あいては自分の番に撮ったバーコードをホストに送るだけ。通信は Supabase Realtime（保存はしない）。 */
+const vs={sid:Math.random().toString(36).slice(2,10)+Date.now().toString(36),ch:null,role:null,code:null,status:'',peerSeen:false,lostAt:0,act:null,before:null,retry:null,lastActNo:0,bid:null,hb:null,lastMsg:0,base:null,hostPeer:null};
+const VS_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const vsNewCode=()=>Array.from({length:5},()=>VS_CHARS[Math.floor(Math.random()*VS_CHARS.length)]).join('');
+const vsNorm=c=>String(c||'').toUpperCase().replace(/[^0-9A-Z]/g,'').slice(0,5);
+const unitSum=u=>({code:u.code,job:u.job,name:String(u.name).slice(0,10),lv:u.lv||1,hp:u.hp||0,st:u.st||0,df:u.df||0});
+function sumToUnit(s){
+  const ok=n=>Number.isFinite(n)&&n>=0&&n<=99999;
+  if(!s||typeof s.code!=='string'||parseCode(s.code).code!==s.code||!JOBS[s.job]||typeof s.name!=='string'||!s.name.trim())return null;
+  if(!Number.isInteger(s.lv)||s.lv<1||s.lv>MAXLV||![s.hp,s.st,s.df].every(ok))return null;
+  return{code:s.code,job:s.job,name:s.name.slice(0,10),lv:s.lv,hp:s.hp,st:s.st,df:s.df,fed:[]};
+}
+function vsPresences(){if(!vs.ch)return[];try{return Object.values(vs.ch.presenceState()).flat()}catch{return[]}}
+function vsPeer(){
+  const ps=vsPresences().filter(p=>p.sid!==vs.sid);
+  if(vs.role==='host')return ps.filter(p=>p.role==='guest').sort((a,b)=>a.at-b.at)[0]||null;
+  return ps.find(p=>p.role==='host')||null;
+}
+function vsSend(payload){if(!vs.ch)return;try{vs.ch.send({type:'broadcast',event:'m',payload:{...payload,from:vs.sid}})}catch{}}
+const fState=f=>({code:f.code,jobKey:f.jobKey,name:f.name,lv:f.lv,maxHp:f.maxHp,hp:f.hp,st:f.st,baseSt:f.baseSt,df:f.df,guard:f.guard||false,legend:!!f.legend});
+function vsSendState(start){
+  if(bs.mode!=='net'||!bs.host)return;
+  vsSend({t:'state',to:bs.peerSid,bid:bs.bid,start:!!start,turnNo:bs.turnNo,turn:bs.turn,over:bs.over,winner:bs.over?(F[0].hp>0?0:1):null,F:[fState(F[0]),fState(F[1])],logs:bs.logs.slice(-5)});
+}
+async function vsOpen(code,role){
+  vsLeave();
+  vs.code=code;vs.role=role;vs.peerSeen=false;vs.status=role==='host'?'待っています':'さがしています';
+  const ch=sb.channel('ba-vs-'+code,{config:{broadcast:{self:false},presence:{key:vs.sid}}});
+  vs.ch=ch;
+  ch.on('broadcast',{event:'m'},msg=>{try{vsOnMsg(msg&&msg.payload)}catch(e){console.error(e)}});
+  ch.on('presence',{event:'sync'},()=>vsOnPresence());
+  await new Promise((res,rej)=>{
+    const t=setTimeout(()=>rej(new Error('timeout')),12000);
+    ch.subscribe(st=>{if(st==='SUBSCRIBED'){clearTimeout(t);res()}else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'){clearTimeout(t);rej(new Error(st))}});
+  });
+  if(vs.ch!==ch)return;
+  vs.base={role,sid:vs.sid,nick:net.me?net.me.nickname:'',f:unitSum(prep.u[0]),at:Date.now()};vs.hostPeer=null;
+  await ch.track(vs.base);
+}
+function vsLeave(){
+  if(!vs.ch)return;
+  try{vsSend({t:'bye'})}catch{}
+  const ch=vs.ch;vs.ch=null;vs.role=null;vs.code=null;clearInterval(vs.retry);vs.retry=null;clearInterval(vs.hb);vs.hb=null;vs.hostPeer=null;
+  try{ch.untrack&&ch.untrack()}catch{}
+  try{sb.removeChannel(ch)}catch{}
+  if(bs.mode==='net'&&!bs.over){bs.over=true}
+}
+function vsOnPresence(){
+  const inBattle=!$('[data-screen="battle"]').hidden&&bs.mode==='net'&&!bs.over;
+  let peer=vsPeer();
+  if(vs.role==='host'){
+    /* バトル中は、始めたときのあいてに固定。待合室では、いちばん先に入った人をあいてにして、みんなに知らせる */
+    if(inBattle)peer=vsPresences().find(p=>p.sid===bs.peerSid)||null;
+    else{const want=peer?peer.sid:null;if(want!==vs.hostPeer&&vs.ch&&vs.base){vs.hostPeer=want;try{vs.ch.track({...vs.base,peer:want})}catch{}}}
+  }else if(peer){
+    if(peer.peer&&peer.peer!==vs.sid){vs.status='いっぱい'}
+    else if(vs.status==='いっぱい'&&peer.peer===vs.sid)vs.status='';
+  }
+  if(peer){vs.peerSeen=true;vs.lostAt=0}
+  if(inBattle){
+    const ban=$('#vsBanner');
+    if(!peer){
+      if(!vs.lostAt)vs.lostAt=Date.now();
+      ban.hidden=false;ban.innerHTML='あいてとの通信が切れました。もどってくるのを待っています…';
+      const q=h('<button class="sub">バトルをやめる（記録は残りません）</button>');q.onclick=()=>{vsLeave();home()};ban.append(q);
+    }else{
+      ban.hidden=true;
+      if(bs.host)vsSendState();
+    }
+    return;
+  }
+  if(!$('[data-screen="prep"]').hidden&&prep.mode==='net')renderPrep();
+}
+function vsOnMsg(m){
+  if(!m||typeof m!=='object'||typeof m.from!=='string')return;
+  if(m.t==='bye'){setTimeout(vsOnPresence,300);return}
+  if(vs.role==='host'){
+    const inBattle=bs.mode==='net'&&!bs.over&&!$('[data-screen="battle"]').hidden;
+    if(!inBattle||m.from!==bs.peerSid)return; /* バトルのあいて以外からの操作は受けつけない */
+    if(m.t==='move'){
+      if(bs.anim)return;
+      if(bs.turn!==1||m.turnNo!==bs.turnNo){vsSendState();return} /* 古い操作：いまの状態を送り直す */
+      let code=null;
+      if(m.code!=null){const r=parseCode(m.code);if(!r.code||r.code===F[0].code||r.code===F[1].code)return;code=r.code}
+      doTurn(1,code);
+    }
+    if(m.t==='hello'&&!bs.anim)vsSendState();
+    return;
+  }
+  /* ここからは、あいて（ゲスト）のスマホ：部屋の主から、自分あての連絡だけを受けとる */
+  const host=vsPeer();
+  if(!host||m.from!==host.sid||(m.to&&m.to!==vs.sid)||vs.status==='いっぱい')return;
+  vs.lastMsg=Date.now();
+  if(m.t==='act'){
+    if(m.bid!==vs.bid||m.turnNo<=vs.lastActNo||!F[0]||bs.over)return;vs.lastActNo=m.turnNo;
+    const aL=1-m.a,A=F[aL];
+    const code=m.code!=null?parseCode(m.code).code:null;
+    const act=code?makeMove(code,A):basicMove();
+    vs.act={a:aL,act};vs.before={ah:A.hp,dh:F[1-aL].hp,ast:A.st,dst:F[1-aL].st,adf:A.df};
+    bs.busy=true;bs.sending=false;clearInterval(vs.retry);vs.retry=null;
+    if(code)beep();
+    showAct(act,label(aL));if(aL===0)discoverMove(act);
+    log(`${A.name}の${act.name}！`);setPanel();
+    return;
+  }
+  if(m.t==='state')vsApplyState(m);
+}
+function vsApplyState(m){
+  if(!Array.isArray(m.F)||m.F.length!==2)return;
+  const mk=s=>{const u=sumToUnit({code:s.code,job:s.jobKey,name:s.name,lv:s.lv,hp:0,st:0,df:0});if(!u)return null;
+    return{...fighter(u),maxHp:+s.maxHp||1,hp:+s.hp||0,st:+s.st||0,baseSt:+s.baseSt||0,df:+s.df||0,guard:typeof s.guard==='number'&&s.guard>0&&s.guard<1?s.guard:false}};
+  const nf=[mk(m.F[1]),mk(m.F[0])];if(!nf[0]||!nf[1])return;
+  const fresh=m.bid!==vs.bid||bs.mode!=='net'||bs.host||!F[0];
+  if(fresh&&m.over)return;           /* 終わったバトルの結果を、あとから受け取らない */
+  if(!fresh&&bs.over)return;         /* 決着したあとに届いた重複は無視（経験値の二重どり防止） */
+  if(fresh){
+    vs.bid=m.bid;bs.mode='net';bs.host=false;F[0]=nf[0];F[1]=nf[1];
+    clearInterval(vs.hb);vs.hb=setInterval(()=>{
+      if(!vs.ch||bs.mode!=='net'||bs.host||bs.over)return;
+      if((bs.turn===1||bs.sending)&&Date.now()-vs.lastMsg>8000){vs.lastMsg=Date.now();vsSend({t:'hello'})} /* 長く何も届かないときは、いまの状態をもらう */
+    },4000);
+    Object.assign(bs,{over:false,busy:false,anim:false,logs:[],used:new Set([F[0].code,F[1].code])});vs.lastActNo=0;vs.act=null;
+    buildBatCtl();$('#actCard').hidden=true;$('#vsBanner').hidden=true;
+    bs.dial=dialEl('battle');$('#batDial').replaceChildren(bs.dial);
+    go('battle');F.forEach((f,i)=>drawSprite($('#f'+i+' .bsprite'),f,innerWidth<440?104:132));
+  }else{
+    /* ダメージや回復を表示してから、新しい数値にする */
+    nf.forEach((f,i)=>{const d=f.hp-F[i].hp;if(d<0){pop(i,String(d));const fld=$('#field');fld.classList.remove('shake');void fld.offsetWidth;fld.classList.add('shake');try{navigator.vibrate&&navigator.vibrate(40)}catch{}}else if(d>0)pop(i,'+'+d);
+      Object.assign(F[i],{hp:f.hp,st:f.st,baseSt:f.baseSt,df:f.df,guard:f.guard,maxHp:f.maxHp,lv:f.lv})});
+  }
+  bs.logs=Array.isArray(m.logs)?m.logs.map(String).slice(-5):[];
+  const ol=$('#log');ol.innerHTML='';bs.logs.forEach(t=>{const li=document.createElement('li');li.textContent=t;ol.append(li)});
+  if(vs.act&&!fresh){showResult(vs.act.a,vs.act.act,vs.before);vs.act=null}
+  bs.turn=m.turn===0?1:0;bs.turnNo=m.turnNo;bs.sending=false;clearInterval(vs.retry);vs.retry=null;
+  refresh();
+  if(m.over){bs.over=true;bs.busy=false;const w=m.winner===0?1:0;finish(w);return}
+  bs.busy=false;setPanel();
+}
+function vsSendMove(code){
+  if(bs.over||bs.turn!==0)return;
+  bs.busy=true;bs.sending=true;setPanel();
+  const msg={t:'move',turnNo:bs.turnNo,code:code||null};
+  vsSend(msg);let n=0;clearInterval(vs.retry);
+  vs.retry=setInterval(()=>{
+    if(!bs.sending){clearInterval(vs.retry);vs.retry=null;return}
+    if(++n>5){clearInterval(vs.retry);vs.retry=null;bs.sending=false;bs.busy=false;setPanel();bScan.show('あいてのスマホに届きませんでした。電波をたしかめて、もう一度撮ってね');return}
+    vsSend(msg);
+  },3000);
+}
+/* 待合室（部屋づくり・あいことば） */
+function renderVsLobby(body,T){
+  const mineCard=cardEl(fighter(prep.u[0]));
+  if(!vs.ch){
+    todo(T,`${esc(prep.u[0].name)}を呼び出した！ 部屋をつくるか、あいてのあいことばで入ろう`,'ふたりとも、それぞれのスマホでこのゲームを開いて、仲間を呼び出しておいてね。');
+    const st=h('<p class="status" hidden></p>'),say=(t,ok)=>{st.textContent=t;st.classList.toggle('ok',!!ok);st.hidden=!t};
+    const mk=h('<button class="big center">部屋をつくる<small>あいことばを、あいてに教えます</small></button>');
+    const join=h(`<div class="share"><h4>あいてがつくった部屋に入る</h4><div class="entry"><input id="vsCode" autocomplete="off" autocapitalize="characters" maxlength="7" placeholder="あいことば（5文字）"><button class="chip">入る</button></div></div>`);
+    const inp=$('#vsCode',join);if(prep.joinCode)inp.value=prep.joinCode;
+    mk.onclick=async()=>{mk.disabled=true;say('部屋をつくっています…',true);
+      try{
+        for(let t=0;t<3;t++){await vsOpen(vsNewCode(),'host');await wait(700);if(!vsPresences().some(p=>p.role==='host'&&p.sid!==vs.sid))break} /* 同じあいことばの部屋がすでにあれば、つくり直す */
+        say('');renderPrep()}catch{vsLeave();say('サーバーにつながりませんでした。もう一度押してね');mk.disabled=false}};
+    const doJoin=async()=>{const c=vsNorm(inp.value);if(c.length!==5){say('あいことばは5文字です');return}
+      $('.chip',join).disabled=true;say('部屋をさがしています…',true);prep.joinCode=null;
+      try{await vsOpen(c,'guest');vsSend({t:'hello'});say('');renderPrep();
+        setTimeout(()=>{if(vs.ch&&vs.role==='guest'&&!vs.peerSeen){vs.status='みつからない';renderPrep()}},5000);
+      }catch{vsLeave();say('サーバーにつながりませんでした。もう一度ためしてね');$('.chip',join).disabled=false}};
+    $('.chip',join).onclick=doJoin;inp.addEventListener('keydown',e=>{if(e.key==='Enter')doJoin()});
+    body.append(h('<div class="vschoice"></div>'));
+    $('.vschoice',body).append(mk,join,st);
+    if(prep.joinCode)setTimeout(doJoin,50);
+    return;
+  }
+  const peer=vsPeer();
+  if(vs.role==='guest'&&vs.status==='いっぱい'){
+    todo(T,'この部屋は、もういっぱいでした','あいことばをたしかめて、別の部屋をつくってもらってね。');
+    const b=h('<button class="big center">もどる</button>');b.onclick=()=>{vsLeave();renderPrep()};body.append(b);return;
+  }
+  if(vs.role==='guest'&&!peer){
+    todo(T,vs.status==='みつからない'?'その部屋が見つかりません':'部屋をさがしています…',vs.status==='みつからない'?'あいことばが合っているか、あいての画面が「待っています」になっているか、たしかめてね。':'');
+    body.append(mineCard);
+    const b=h('<button class="sub">あいことばを入れ直す</button>');b.onclick=()=>{vsLeave();renderPrep()};body.append(b);return;
+  }
+  if(vs.role==='host'){
+    const link=`${SHARE_BASE}#vs-${vs.code}`;
+    todo(T,peer?`${esc(peer.nick||'あいて')}が入ってきた！ じゅんびができたら、バトル開始`:'あいてに、あいことばを教えてね',peer?'バトルの計算は、このスマホでします。':'あいては「友だちと（別のスマホ）」→ 仲間を呼び出す →「入る」に、このあいことばを入れます。');
+    body.append(h(`<div class="vscode"><small>あいことば</small>${esc(vs.code)}</div>`));
+    if(!peer){const lb=linkBox(link,'対戦の招待リンク',`バーコードアリーナで対戦しよう！ あいことば ${vs.code}`,null);body.append(lb)}
+  }else{
+    todo(T,`${esc(peer.nick||'あいて')}の部屋に入りました！`,'あいてが「バトル開始」を押すのを待っています。');
+  }
+  const pair=h('<div class="vspair"></div>');
+  pair.append(h('<p class="who">あなた</p>'),mineCard);
+  if(peer&&peer.f){const u=sumToUnit(peer.f);if(u){pair.append(h(`<p class="who">あいて：${esc(peer.nick||'')}</p>`),cardEl(fighter(u)))}}
+  else pair.append(h('<div class="vswait"><span class="dots3"><i></i><i></i><i></i></span>あいてを待っています</div>'));
+  body.append(pair);
+  if(vs.role==='host'&&peer){const go_=h('<button class="big center">バトル開始！</button>');go_.onclick=startBattle;body.append(go_)}
+  const lv=h('<button class="sub">部屋を出る</button>');lv.onclick=()=>{vsLeave();renderPrep()};body.append(lv);
+}
+
 
 /* ---------- FEED ---------- */
 const MAXLV=50;
@@ -1669,7 +1905,7 @@ function renderRules(){
   const out=h('<div class="choice"></div>');
   const sc=scanner({label:'商品をしらべる',sub:'使わずに、出る技と育ち方だけ見る',color:'ink',trial:true,onCode:code=>{
     beep();out.innerHTML='';
-    const rd=readCode(code,null),K=KINDS[rd.kind];
+    const rd=readCode(code,null);
     const box=h('<div class="paperwhy"></div>');box.append(sticker(code));
     const luck=ms.filter(({u})=>luckyOf(u.code)===rd.last).map(({u})=>esc(u.name));
     const mine=findUnit(code);
@@ -1734,7 +1970,6 @@ const loadImg=src=>new Promise(r=>{const im=new Image();im.onload=()=>r(im);im.o
 async function fontsReady(){try{await Promise.race([Promise.all(['900 52px','800 30px','700 24px'].map(w=>document.fonts.load(`${w} "M PLUS Rounded 1c"`))),new Promise(r=>setTimeout(r,2500))])}catch{}}
 function rrect(g,x,y,w,hh,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+hh,r);g.arcTo(x+w,y+hh,x,y+hh,r);g.arcTo(x,y+hh,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
 function fitText(g,t,max,size,weight){let s=size;do{g.font=`${weight} ${s}px "M PLUS Rounded 1c","Hiragino Maru Gothic ProN",sans-serif`;s-=2}while(g.measureText(t).width>max&&s>12);return t}
-function wrapText(g,t,x,y,max,lh,lines=2){let row='',n=0;for(const ch of t){if(g.measureText(row+ch).width>max){g.fillText(row,x,y+n*lh);row=ch;if(++n>=lines-1&&g.measureText(t).width>max*lines){}}else row+=ch}g.fillText(row,x,y+n*lh)}
 async function drawTradingCard(f,no,img){
   await fontsReady();
   const cv=document.createElement('canvas');cv.width=CW;cv.height=CH;const g=cv.getContext('2d');
@@ -1861,17 +2096,18 @@ async function renderCardScreen(f,no,imgSrc,shared){
   }
 }
 $('#cardBack').onclick=()=>{if(cardState&&cardState.from==='done')crShow('done'),go('create');else{try{if(location.hash.startsWith('#card-'))history.replaceState(null,'',location.pathname+location.search)}catch{}home()}};
-let pendingFriend=null;
+let pendingFriend=null,pendingVs=null;
 function openSharedCard(){
   const tok=location.hash.slice(1);
   if(tok.startsWith('friend-')){pendingFriend=tok.slice(7);if(ONLINE&&net.ready)startFriends();return false}
+  if(tok.startsWith('vs-')){pendingVs=vsNorm(tok.slice(3));try{history.replaceState(null,'',location.pathname+location.search)}catch{}if(ONLINE&&net.ready){prep.joinCode=pendingVs;pendingVs=null;startPrep('net')}return false}
   if(!tok.startsWith('card-'))return false;
   const c=cardFromToken(tok.slice(5));
   go('card');$('#cardTitle').textContent='とどいたトレカ';cardState={from:'shared'};
   if(!c){cardTodo('このカードのリンクは読めませんでした','リンクが途中で切れていないか確かめてね。');$('#cardBody').innerHTML='';const p=h('<button class="big center">ゲームをはじめる</button>');p.onclick=()=>enterGame();$('#cardBody').append(p);return true}
   renderCardScreen(c.f,c.no,null,true);return true;
 }
-function enterGame(){if(ONLINE&&net.needWelcome)return showWelcome();if(store.get('ba-tut',0)<2)startTut();else home()}
+function enterGame(){if(ONLINE&&net.needWelcome)return showWelcome();if(pendingVs&&ONLINE&&net.ready){prep.joinCode=pendingVs;pendingVs=null;return startPrep('net')}if(store.get('ba-tut',0)<2)startTut();else home()}
 
 /* ---------- オンライン：保存の同期 ---------- */
 function collectSave(){const d={v:1,savedAt:Date.now()};SYNC_KEYS.forEach(k=>d[k]=store.get(k,null));return d}
@@ -2158,7 +2394,7 @@ $('#goOnline').onclick=()=>{try{localStorage.removeItem('ba-mode')}catch{}locati
   if(net.choose){showChoose(net.choose);return}
   if(authNotice==='linked'){authNotice=null;toast('Googleと連携しました！','スマホを替えても、Googleでログインすれば同じデータで遊べます')}
   if(authNotice==='link-taken'||authNotice==='link-failed'){if(net.ready){startFriends();return}}
-  if(!shared){if(pendingFriend&&net.ready)startFriends();else enterGame()}
+  if(!shared){if(pendingVs&&net.ready&&!net.needWelcome){prep.joinCode=pendingVs;pendingVs=null;startPrep('net')}else if(pendingFriend&&net.ready)startFriends();else enterGame()}
   else if(ONLINE&&net.ready&&$('[data-screen="home"]').hidden===false)home();
 })();
 addEventListener('hashchange',()=>openSharedCard());
