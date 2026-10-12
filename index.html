@@ -593,9 +593,9 @@ const store={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??
    Supabase の「Project Settings → API」にある値をここに入れると、オンライン版になります。
    空のままなら、今までどおりこのブラウザだけに保存して遊べます。 */
 const CONFIG={
-  SUPABASE_URL:'https://mnypslgxifullrjuzton.supabase.co/rest/v1/',       // 例 'https://abcdefghijkl.supabase.co'
+  SUPABASE_URL:'https://mnypslgxifullrjuzton.supabase.co',       // 例 'https://abcdefghijkl.supabase.co'
   SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ueXBzbGd4aWZ1bGxyanV6dG9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2OTUzMDMsImV4cCI6MjEwNzI3MTMwM30.QQeHyRlc_bZk1dYD0ZDF1WdsQ-qrYOAT9BNc2fdWjcI',  // 例 'eyJhbGciOi...'（anon public キー。公開しても大丈夫なキー）
-  GOOGLE_LOGIN:true     // Googleログインの設定（手順書の手順7）が終わったら true にする
+  GOOGLE_LOGIN:false     // Googleログインの設定（手順書の手順7）が終わったら true にする
 };
 const SERVER=!!(CONFIG.SUPABASE_URL&&CONFIG.SUPABASE_ANON_KEY&&window.supabase);
 const LOCAL_ONLY=(()=>{try{return localStorage.getItem('ba-mode')==='"local"'}catch{return false}})();
@@ -603,7 +603,9 @@ const ONLINE=SERVER&&!LOCAL_ONLY;
 const RETURN_URL=location.origin+location.pathname;
 /* Googleから戻ってきたときのエラー（URLの ?error=… や #error=…）を先に読んでおく */
 const AUTH_ERR=(()=>{try{const q=new URLSearchParams(location.search),hs=new URLSearchParams(location.hash.slice(1));const g=k=>q.get(k)||hs.get(k)||'';const e=g('error');return e?{error:e,code:g('error_code'),desc:g('error_description')}:null}catch{return null}})();
-const sb=ONLINE?window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{auth:{flowType:'pkce',detectSessionInUrl:true,persistSession:true}}):null;
+/* URLの後ろに /rest/v1/ などが付いていても動くように、プロジェクトのURLだけにそろえる */
+const SB_URL=String(CONFIG.SUPABASE_URL).trim().replace(/\/(rest|auth)\/v1.*$/,'').replace(/\/+$/,'');
+const sb=ONLINE?window.supabase.createClient(SB_URL,CONFIG.SUPABASE_ANON_KEY.trim(),{auth:{flowType:'pkce',detectSessionInUrl:true,persistSession:true}}):null;
 const SYNC_KEYS=['ba-player','ba-units','ba-record','ba-found','ba-meal','ba-tut'];
 const net={ready:false,needWelcome:false,welcomeMode:'start',uid:null,me:null,user:null,offline:false,incoming:0};
 let applying=false,syncT=null;
