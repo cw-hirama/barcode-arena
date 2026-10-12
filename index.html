@@ -321,6 +321,13 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
 .rank .nm span{font-size:12px;color:var(--muted)}
 .rank .lvv{font:900 17px var(--f-round);font-variant-numeric:tabular-nums;color:var(--navy)}
 .empty{background:#ffffff88;border-radius:16px;padding:16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px}
+/* おなかいっぱい・共有 */
+.fullcard{background:var(--card);border-radius:20px;padding:16px;box-shadow:0 4px 14px #2b2f5514;display:flex;flex-direction:column;gap:10px;text-align:center;align-items:stretch}
+.fullcard b{font-weight:900;font-size:18px}
+.fullcard p{margin:0;font-size:13.5px;color:var(--muted)}
+.chip.done{background:var(--k-heal);box-shadow:0 3px 0 #127a4b}
+.sharebtns{display:flex;gap:8px;flex-wrap:wrap}
+.sharebtns>*{flex:1}
 /* ログイン方法 */
 .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12.5px;font-weight:800}
 .or::before,.or::after{content:"";flex:1;height:2px;background:#ffffffaa;border-radius:2px}
@@ -409,14 +416,14 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
 .steps li{display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:start;font-size:14px;line-height:1.5;counter-increment:st}
 .steps li::before{content:counter(st);width:24px;height:24px;border-radius:50%;background:var(--navy);color:#fff;font-weight:900;font-size:12.5px;display:grid;place-items:center}
 .steps b{color:var(--kc,var(--red))}
-.mv{border-radius:20px;padding:14px 16px;border:3px solid var(--kc);background:color-mix(in srgb,var(--kc) 10%,#fff);display:flex;flex-direction:column;gap:4px}
+.mv{border-radius:20px;padding:14px 16px;border:3px solid var(--kc);background:#f6f8ff;background:color-mix(in srgb,var(--kc) 10%,#fff);display:flex;flex-direction:column;gap:4px}
 .mv .nm{font-weight:900;font-size:24px;line-height:1.25}
 .mv .nm .rk{color:var(--gold);-webkit-text-stroke:.7px #b98400;font-size:20px;margin-left:6px}
 .mv .ds{font-size:13px;color:var(--muted)}
 .est{font-weight:900;font-size:17px;line-height:1.45}
 .est small{display:block;font-weight:700;font-size:12.5px;color:var(--muted)}
 .warnline{font-weight:800;font-size:13px;color:#a3202f;background:#ffe5e8;border-radius:12px;padding:8px 12px}
-.big.kc{background:var(--kc);box-shadow:0 5px 0 color-mix(in srgb,var(--kc) 65%,#000),0 10px 18px color-mix(in srgb,var(--kc) 30%,#0000)}
+.big.kc{background:var(--kc);box-shadow:0 5px 0 #0004;box-shadow:0 5px 0 color-mix(in srgb,var(--kc) 65%,#000),0 10px 18px color-mix(in srgb,var(--kc) 30%,#0000)}
 .res{margin-top:6px;padding:10px 12px;background:#fff;border-radius:14px;display:flex;flex-direction:column;gap:2px;animation:card .3s ease-out}
 .res .rl{font-weight:900;font-size:11.5px;color:#fff;background:var(--navy);border-radius:999px;padding:1px 9px;align-self:flex-start;margin-bottom:2px}
 .res span{font-weight:900;font-size:15.5px}
@@ -609,7 +616,7 @@ const sb=ONLINE?window.supabase.createClient(SB_URL,CONFIG.SUPABASE_ANON_KEY.tri
 const SYNC_KEYS=['ba-player','ba-units','ba-record','ba-found','ba-meal','ba-tut'];
 const net={ready:false,needWelcome:false,welcomeMode:'start',uid:null,me:null,user:null,offline:false,incoming:0};
 let applying=false,syncT=null;
-function markDirty(){if(applying)return;try{localStorage.setItem('ba-dirty-at',String(Date.now()))}catch{}if(ONLINE&&net.ready){clearTimeout(syncT);syncT=setTimeout(()=>pushSave(),1500)}}
+function markDirty(){if(applying)return;try{localStorage.setItem('ba-dirty-at',String(Date.now()))}catch{}if(ONLINE&&net.ready){clearTimeout(syncT);syncT=setTimeout(()=>{syncT=null;pushSave()},1500)}}
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const h=(html)=>{const t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstElementChild};
 const todo=(el,main,sub)=>{el.innerHTML=`<b>やること</b><p>${main}${sub?`<small>${sub}</small>`:''}</p>`};
@@ -1281,6 +1288,8 @@ function openConfirm(code){
   $('#cfYes',back).onclick=()=>{back.remove();bs.dial?.setOn(null);doTurn(bs.turn,code)};
   $('#cfNo',back).onclick=()=>{closeConfirm();bScan.show('やめました。別の商品を撮ってね',true)};
   $('#cfYes',back).focus();
+  back.addEventListener('click',e=>{if(e.target===back)$('#cfNo',back).click()});
+  back.addEventListener('keydown',e=>{if(e.key==='Escape')$('#cfNo',back).click()});
 }
 function log(t){bs.logs.push(t);const ol=$('#log');ol.innerHTML='';bs.logs.slice(-5).forEach(s=>{const li=document.createElement('li');li.textContent=s;ol.append(li)})}
 function refresh(){
@@ -1495,11 +1504,18 @@ function renderFeed(){
   $('#feedNo').textContent='2/2';
   const u=units[feedSlot],L=luckyOf(u.code);
   todo(T,`${esc(u.name)}に食べさせる商品のバーコードを撮ってください`,`1日${mealCap()}枚までなので、撮ったあと伸び方を見て、よく選んでから食べさせよう。最後が ${L}（ラッキー数字）の商品は1.5倍！`);
+  const feedUI={sc:null};
   const mealBox=h('<div class="meal"></div>');
   const drawMeal=()=>{const cap=mealCap(),used=Math.min(cap,eatenToday(u)),left=cap-used;
     mealBox.classList.toggle('full',!left);
     mealBox.innerHTML=`<span>今日のごはん</span><span class="plates">${Array.from({length:cap},(_,i)=>`<i class="${i<used?'used':''}"></i>`).join('')}</span><span class="rest">${left?`あと${left}枚`:'おなかいっぱい！ また明日'}</span>${isBonusDay()?'<span class="btag">ボーナス日</span>':''}`;
+    feedUI.sc&&(feedUI.sc.hidden=!left);fullBox.hidden=!!left;
     return left};
+  const others=()=>mates().filter(x=>x.i!==feedSlot&&mealsLeft(x.u)>0).length;
+  const fullBox=h('<div class="fullcard" hidden></div>');
+  const drawFull=()=>{const o=others();fullBox.innerHTML=`<b>今日のごはんは、おしまい！</b><p>${esc(u.name)}は1日${mealCap()}枚まで食べられます。夜0時をすぎると、また食べられるよ。${o?`<br>まだ食べられる仲間が${o}人います。`:''}</p>`;
+    if(o){const bo=h('<button class="big blue center">ほかの仲間を育てる</button>');bo.onclick=()=>{feedSlot=null;renderFeed()};fullBox.append(bo)}
+    const bh=h('<button class="sub">ホームにもどる</button>');bh.onclick=()=>home();fullBox.append(bh)};
   const cardBox=h('<div></div>');cardBox.append(cardEl(fighter(u)));
   const dial=dialEl('feed');
   const cap=h('<p class="dial-cap">最後の数字で伸びる力が決まる。同じ数字が多いほど、たくさん伸びる</p>');
@@ -1507,7 +1523,7 @@ function renderFeed(){
   const logBox=h('<div class="lcd feedlog"><span>まだ何も食べていません</span></div>');
   let pending=null;
   const clearPv=()=>{pending=null;pv.innerHTML='';dial.setOn(null)};
-  const sc=scanner({label:'商品のバーコードを撮る',sub:'食べさせる前に、どう育つか見られます',color:'blue',trial:true,onCode:mat=>{
+  const sc=feedUI.sc=scanner({label:'商品のバーコードを撮る',sub:'食べさせる前に、どう育つか見られます',color:'blue',trial:true,onCode:mat=>{
     if(mealsLeft(u)<=0){drawMeal();return`今日はもうおなかいっぱい。${u.name}には明日また食べさせてね（ほかの仲間はまだ食べられるかも）`}
     if(mat===u.code)return'それは自分の商品です。別の商品にしてね';
     if(u.lv>=MAXLV)return`Lv.${MAXLV}になりました。これ以上は育ちません`;
@@ -1533,19 +1549,20 @@ function renderFeed(){
     if(mealsLeft(u)<=0){clearPv();drawMeal();sc.show('今日はもうおなかいっぱい。明日また食べさせてね');sc.setOff(true);return}
     u.lv++;u.hp+=dd.hp;u.st+=dd.st;u.df+=dd.df;u.fed.push(mat);
     if(!saveUnits()){u.lv--;u.hp-=dd.hp;u.st-=dd.st;u.df-=dd.df;u.fed.pop();sc.show('保存できませんでした');return}
+    countMeal(u);
     const lv=gainExp(2);
     fanfare();
     cardBox.innerHTML='';cardBox.append(cardEl(fighter(u),dd));
-    logBox.innerHTML=`<span class="bl">おいしかった！ Lv.${u.lv-1} → Lv.${u.lv}</span><span>体力+${dd.hp}　攻撃+${dd.st}　守り+${dd.df}</span>${notes.map(n=>`<span>${n}</span>`).join('')}${rd.luckyHit?'<span>ラッキー数字で1.5倍！</span>':''}${lv.map(n=>`<span>${n}</span>`).join('')}<span>つづけて別の商品も撮れるよ</span>`;
-    countMeal(u);clearPv();sc.show('');
-    if(!drawMeal()){sc.setOff(true);sc.show('今日はもうおなかいっぱい。明日また食べさせてね',true)}
+    logBox.innerHTML=`<span class="bl">おいしかった！ Lv.${u.lv-1} → Lv.${u.lv}</span><span>体力+${dd.hp}　攻撃+${dd.st}　守り+${dd.df}</span>${notes.map(n=>`<span>${n}</span>`).join('')}${rd.luckyHit?'<span>ラッキー数字で1.5倍！</span>':''}${lv.map(n=>`<span>${n}</span>`).join('')}${mealsLeft(u)>0?`<span>あと${mealsLeft(u)}枚食べられるよ。つづけて撮ってね</span>`:''}`;
+    clearPv();sc.show('');
+    if(!drawMeal()){drawFull();fullBox.scrollIntoView({behavior:reduced?'auto':'smooth',block:'center'})}
     discover('focus');
     if(rd.stars===3)setTimeout(()=>discover('star3'),900);
     if(rd.luckyHit)setTimeout(()=>discover('lucky'),1800);
     cardBox.scrollIntoView({behavior:reduced?'auto':'smooth',block:'start'});
   }
-  body.append(cardBox,mealBox,dial,cap,sc,pv,logBox);
-  if(!drawMeal()){sc.setOff(true);sc.show(`今日はもうおなかいっぱい。${u.name}には明日また食べさせてね`,true)}
+  body.append(cardBox,mealBox,dial,cap,sc,fullBox,pv,logBox);
+  if(!drawMeal())drawFull();
   const done=h('<button class="sub">おわる（ホームへ）</button>');done.onclick=()=>home();body.append(done);
 }
 
@@ -1668,6 +1685,35 @@ function renderRules(){
 }
 
 /* ---------- boot ---------- */
+/* ---------- コピーと共有（スマホのいろいろなブラウザで動くように） ---------- */
+async function copyText(text){
+  try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);return true}}catch{}
+  try{
+    const ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');
+    ta.style.cssText='position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px';
+    document.body.append(ta);ta.focus();ta.select();ta.setSelectionRange(0,text.length);
+    const ok=document.execCommand('copy');ta.remove();if(ok)return true;
+  }catch{}
+  return false;
+}
+/* コピーボタンと「送る」ボタンを付けた共有欄 */
+function linkBox(link,title,text,say){
+  const box=h(`<div><div class="entry"><input readonly aria-label="${esc(title)}"><button class="chip">コピー</button></div><div class="sharebtns" style="margin-top:8px"></div></div>`);
+  const inp=$('input',box),btn=$('.chip',box);inp.value=link;
+  inp.onfocus=()=>{inp.select();try{inp.setSelectionRange(0,link.length)}catch{}};
+  btn.onclick=async()=>{
+    const ok=await copyText(link);
+    if(ok){btn.textContent='コピーしました ✓';btn.classList.add('done');say&&say('リンクをコピーしました！ LINEやメールに貼りつけてね',true);setTimeout(()=>{btn.textContent='コピー';btn.classList.remove('done')},2500)}
+    else{inp.focus();say&&say('自動でコピーできませんでした。上のリンクを長押しして「コピー」を選んでね')}
+  };
+  if(navigator.share){
+    const sb2=h('<button class="sub">LINEなどで送る</button>');
+    sb2.onclick=async()=>{try{await navigator.share({title,text,url:link})}catch{}};
+    $('.sharebtns',box).append(sb2);
+  }
+  return box;
+}
+
 /* ---------- トレカ（画像・印刷用PDF・共有リンク） ---------- */
 const SHARE_BASE=SERVER?RETURN_URL:'https://claude.ai/artifact/Eh8P1a3piYFNvNcRV72gtz';
 const CW=744,CH=1039; /* 63×88mm を300dpiで */
@@ -1804,11 +1850,11 @@ async function renderCardScreen(f,no,imgSrc,shared){
   if(!shared){
     const link=`${SHARE_BASE}#${cardToken(f,no)}`;
     const sh=h(`<div class="share"><h4>友だちに見せるリンク</h4>
-      <div class="entry"><label class="sr" for="shareLink">共有リンク</label><input id="shareLink" readonly value="${esc(link)}"><button class="chip">コピー</button></div>
+      <div class="lb"></div>
       <p>このリンクを開くと、このカードが表示されます。${SERVER?'':'友だちが開けるようにするには、このゲームのページを右上の「共有」から公開しておいてね。'}${f.img||imgSrc?'自分で描いた絵はリンクには入らず、バーコードから生まれた姿で表示されます。':''}</p></div>`);
-    const inp=$('input',sh);
-    $('.chip',sh).onclick=async()=>{try{await navigator.clipboard.writeText(link);status('リンクをコピーしました！',true)}catch{inp.focus();inp.select();status('リンクを選んだので、コピーしてね',true)}};
-    inp.onfocus=()=>inp.select();
+    const say2=(t,ok)=>{let m=$('.lbmsg',sh);if(!m){m=h('<p class="status lbmsg"></p>');sh.append(m)}m.textContent=t;m.classList.toggle('ok',!!ok)};
+    const lb=linkBox(link,`${f.name}のトレカ`,`バーコードアリーナの「${f.name}」のトレカを見てね！`,say2);$('input',lb).id='shareLink';
+    $('.lb',sh).replaceWith(lb);
     body.append(sh);
   }else{
     const play=h('<button class="big center">自分も遊んでみる</button>');play.onclick=()=>{try{history.replaceState(null,'',location.pathname+location.search)}catch{}cardState=null;enterGame()};body.append(play);
@@ -1905,10 +1951,11 @@ async function onlineBoot(){
     net.me=data[0];net.ready=true;
     if(intent==='link'&&!AUTH_ERR&&isGoogle(session.user))authNotice='linked';
     const owner=getOwner();
-    if(intent==='login'&&owner!==net.uid&&localHasData()){
+    const choosing=(()=>{try{return localStorage.getItem('ba-choose-pending')===net.uid}catch{return false}})();
+    if((intent==='login'||choosing)&&owner!==net.uid&&localHasData()){
       /* 新しい端末やブラウザでログイン：この端末にも別のデータがあるので選んでもらう */
       let cloud=null;try{cloud=await fetchCloud()}catch{}
-      if(cloud&&cloudHasData(cloud)){net.choose=cloud;return}
+      if(cloud&&cloudHasData(cloud)){net.choose=cloud;try{localStorage.setItem('ba-choose-pending',net.uid)}catch{}return}
     }
     await pullOrPush(!!owner&&owner!==net.uid);await refreshIncoming();
   }catch{setNet(false)}
@@ -1974,8 +2021,9 @@ function showChoose(cloud){
   const local=collectSave();
   const c1=h(`<div class="opt"><h4>Googleアカウントのデータ</h4><p>${esc(net.me.nickname)}・${saveSummary(cloud)}</p><button class="big blue center">こちらで遊ぶ</button></div>`);
   const c2=h(`<div class="opt"><h4>この端末のデータ</h4><p>${saveSummary(local)}</p><button class="sub">こちらで遊ぶ（Googleアカウントのデータに上書き）</button></div>`);
-  $('button',c1).onclick=async()=>{applySave(cloud);net.ready=true;net.choose=null;await refreshIncoming();toast('ログインしました','Googleアカウントのデータで遊びます');home()};
-  $('button',c2).onclick=async()=>{net.ready=true;net.choose=null;await pushSave();await refreshIncoming();toast('ログインしました','この端末のデータをGoogleアカウントに保存しました');home()};
+  const done=()=>{try{localStorage.removeItem('ba-choose-pending')}catch{}};
+  $('button',c1).onclick=async()=>{done();applySave(cloud);net.ready=true;net.choose=null;await refreshIncoming();toast('ログインしました','Googleアカウントのデータで遊びます');home()};
+  $('button',c2).onclick=async()=>{done();net.ready=true;net.choose=null;await pushSave();await refreshIncoming();toast('ログインしました','この端末のデータをGoogleアカウントに保存しました');home()};
   b.append(c1,c2);
 }
 /* アカウントの欄（ともだち画面の下） */
@@ -2029,8 +2077,8 @@ async function renderFriends(){
   const link=`${SHARE_BASE}#friend-${code}`;
   const mine=h(`<div class="share"><h4>あなたのフレンドコード</h4><div class="code-big">${esc(fmtFriendCode(code))}</div>
     <p>このコードか、下のリンクを友だちに教えてね。相手も申請してくれたら友だちになります。</p>
-    <div class="entry"><label class="sr" for="frLink">友だち追加リンク</label><input id="frLink" readonly value="${esc(link)}"><button class="chip">コピー</button></div></div>`);
-  $('.chip',mine).onclick=async()=>{try{await navigator.clipboard.writeText(link);say('リンクをコピーしました',true)}catch{const i=$('#frLink');i.focus();i.select();say('リンクを選んだので、コピーしてね',true)}};
+    <div class="lb"></div></div>`);
+  {const lb=linkBox(link,'友だち追加リンク',`バーコードアリーナで友だちになろう！ フレンドコード ${fmtFriendCode(code)}`,(t,ok)=>{let m=$('.lbmsg',mine);if(!m){m=h('<p class="status lbmsg"></p>');mine.append(m)}m.textContent=t;m.classList.toggle('ok',!!ok)});$('input',lb).id='frLink';$('.lb',mine).replaceWith(lb)}
   const add=h(`<div class="share"><h4>友だちを追加</h4><div class="entry"><label class="sr" for="frCode">友だちのフレンドコード</label><input id="frCode" autocomplete="off" placeholder="XXXX-XXXX"><button class="chip">申請する</button></div></div>`);
   if(pendingFriend){$('#frCode',add).value=fmtFriendCode(String(pendingFriend).toUpperCase().replace(/[^0-9A-Z]/g,'').slice(0,8));pendingFriend=null;try{history.replaceState(null,'',location.pathname+location.search)}catch{}}
   $('.chip',add).onclick=async()=>{
@@ -2114,6 +2162,18 @@ $('#goOnline').onclick=()=>{try{localStorage.removeItem('ba-mode')}catch{}locati
   else if(ONLINE&&net.ready&&$('[data-screen="home"]').hidden===false)home();
 })();
 addEventListener('hashchange',()=>openSharedCard());
+/* 画面を閉じる・アプリを切りかえるときは、待たずにすぐ保存する */
+const flushSave=()=>{if(ONLINE&&net.ready&&syncT){clearTimeout(syncT);syncT=null;pushSave()}};
+addEventListener('pagehide',flushSave);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSave()});
+/* 起動時に電波がなかったときは、つながったらもう一度サーバーにつなぐ */
+addEventListener('online',async()=>{
+  if(!ONLINE)return;
+  if(net.ready){pushSave();return}
+  if(net.needWelcome||net.choose)return;
+  await onlineBoot();
+  if(net.ready&&!$('[data-screen="home"]').hidden)home();
+});
 addEventListener('resize',()=>$$('.sticker').forEach(s=>{const c=s.querySelector('.digits').textContent.replace(/\s/g,'');drawBarcode($('.bars',s),c)}));
 })();
 </script>
