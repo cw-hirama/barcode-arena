@@ -323,6 +323,13 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
 .rank .nm span{font-size:12px;color:var(--muted)}
 .rank .lvv{font:900 17px var(--f-round);font-variant-numeric:tabular-nums;color:var(--navy)}
 .empty{background:#ffffff88;border-radius:16px;padding:16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px}
+/* micro:bit */
+.mbbox{display:flex;flex-direction:column;gap:6px}
+.mbbox .row>button{flex:1}
+#mbBtn{display:flex;align-items:center;justify-content:center;gap:8px}
+.mbdot{width:10px;height:10px;border-radius:50%;background:#b9bed3;flex:none}
+.mbbox.on .mbdot{background:#2fbf71;box-shadow:0 0 0 4px #2fbf7133}
+#mbMsg{margin:0}
 /* バトル履歴 */
 .hsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}
 .hsum .box{background:var(--card);border-radius:18px;padding:12px 14px;box-shadow:0 4px 14px #2b2f5514;display:flex;flex-direction:column;gap:4px}
@@ -487,6 +494,10 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
       <button class="sub" id="goOnline" hidden>サーバーにつないで、友だちやランキングで遊ぶ</button>
       <div class="row"><button class="sub" id="histBtn">バトル履歴</button><button class="sub" id="manBtn">たたかい方マニュアル</button></div>
       <button class="sub" id="rulesBtn">バーコードの読み方・しらべる</button>
+      <div class="mbbox" id="mbBox" hidden>
+        <div class="row"><button class="sub" id="mbBtn"><span class="mbdot"></span><span id="mbLbl">micro:bit をつなぐ</span></button><button class="sub" id="mbTest" hidden>光らせてみる</button><button class="sub" id="mbOff" hidden>切る</button></div>
+        <p class="small" id="mbMsg" hidden></p>
+      </div>
       <h3 id="mateHead">あなたの仲間 <small style="font-weight:700;font-size:12px;color:var(--muted)">タップでトレカ</small></h3>
       <ul class="list" id="mateList"></ul>
       <button class="link" id="howBtn">あそびかたを見る</button>
@@ -1049,6 +1060,10 @@ $('#howBtn').onclick=()=>startTut();
 $('#rulesBtn').onclick=()=>startRules();
 $('#manBtn').onclick=()=>startManual();
 $('#histBtn').onclick=()=>startHistory();
+$('#mbBox').hidden=!mbOk();
+$('#mbBtn').onclick=()=>{if(mb.ch)mbSend('T');else if(!mb.busy)mbConnect()};
+$('#mbTest').onclick=()=>mbSend('H9');
+$('#mbOff').onclick=()=>mbOffNow();
 
 /* ---------- TUTORIAL ---------- */
 const TUT=[
@@ -1362,7 +1377,48 @@ function setPanel(){
     bScan.show('');bs.dial?.setOn(null);
   }else todo(T,bs.turn===1&&!bs.busy?(bs.mode==='net'?`あいて（${esc(F[1].name)}）の番です`:'相手（CPU）の番です。ちょっと待ってね'):bs.turn===1&&bs.mode==='cpu'?'相手（CPU）の番です。ちょっと待ってね':bs.mode==='net'&&!bs.host&&bs.sending?'あいてのスマホに送っています…':'技が出ています…',bs.turn===1&&bs.mode==='net'&&!bs.busy?'あいてがバーコードを撮るのを待っています。あいてのスマホでも同じバトルが見えています。':'');
 }
+/* ---------- micro:bit（Web Bluetooth）：自分の仲間がダメージを受けたら、ネオピクセルを光らせる ----------
+   送るメッセージ（最後に改行）：H1〜H9＝ダメージ（数字が大きいほど強く）／S＝バトル開始／W＝勝ち／L＝負け／T＝テスト */
+const MB_UART='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const mb={dev:null,ch:null,q:Promise.resolve(),busy:false};
+function mbOk(){return !!(navigator.bluetooth&&navigator.bluetooth.requestDevice)}
+function mbUI(msg){
+  const on=!!mb.ch;$('#mbBox').classList.toggle('on',on);
+  $('#mbLbl').textContent=on?`micro:bit つながっています${mb.dev&&mb.dev.name?'（'+mb.dev.name.replace(/^BBC micro:bit\s*/,'').replace(/^\[|\]$/g,'')+'）':''}`:mb.busy?'つないでいます…':'micro:bit をつなぐ';
+  $('#mbTest').hidden=!on;$('#mbOff').hidden=!on;$('#mbBtn').disabled=mb.busy;
+  const m=$('#mbMsg');if(msg!==undefined){m.textContent=msg;m.hidden=!msg}
+}
+async function mbConnect(){
+  if(!mbOk()){mbUI('このブラウザは Bluetooth に対応していません。パソコンやAndroidの Chrome / Edge で開いてね');return}
+  mb.busy=true;mbUI('');
+  try{
+    const dev=await navigator.bluetooth.requestDevice({filters:[{namePrefix:'BBC micro:bit'}],optionalServices:[MB_UART]});
+    mb.dev=dev;dev.addEventListener('gattserverdisconnected',()=>{const was=!!mb.ch;mb.ch=null;mbUI(was?'micro:bit との接続が切れました。もう一度つないでね':'');});
+    const gatt=await dev.gatt.connect();
+    const svc=await gatt.getPrimaryService(MB_UART);
+    const chs=await svc.getCharacteristics();
+    /* micro:bit が受けとる側（書きこめる方）を自動でえらぶ */
+    mb.ch=chs.find(c=>c.properties.write||c.properties.writeWithoutResponse)||null;
+    if(!mb.ch)throw new Error('nouart');
+    mb.busy=false;mbUI('つながりました！ バトルで自分の仲間がダメージを受けると光ります');mbSend('T');
+  }catch(e){
+    mb.busy=false;mb.ch=null;try{mb.dev&&mb.dev.gatt.connected&&mb.dev.gatt.disconnect()}catch{}
+    const n=e&&e.name,t=String(e&&e.message||'');
+    mbUI(n==='NotFoundError'&&/cancel/i.test(t)?'':n==='SecurityError'||n==='NotAllowedError'?'このページからは Bluetooth を使えません。GitHub の公開ページ（https）を Chrome / Edge で開いてね':
+      t==='nouart'||/service/i.test(t)?'micro:bit に「Bluetooth UART」のプログラムが入っていないようです。MakeCode のプログラムを書きこんでね':
+      n==='NotFoundError'?'micro:bit が見つかりませんでした。電源と、プログラムが入っているかを確かめてね':'つなげませんでした。micro:bit をリセットして、もう一度ためしてね');
+  }
+}
+function mbOffNow(){const d=mb.dev;mb.ch=null;try{d&&d.gatt.connected&&d.gatt.disconnect()}catch{}mbUI('切りました')}
+function mbSend(code){
+  if(!mb.ch)return;
+  const ch=mb.ch,data=new TextEncoder().encode(code+'\n');
+  /* Bluetooth は1つずつしか送れないので、順番待ちにする */
+  mb.q=mb.q.then(()=>ch.writeValueWithoutResponse&&ch.properties.writeWithoutResponse?ch.writeValueWithoutResponse(data):ch.writeValue(data)).catch(()=>{});
+}
+const mbHit=(dmg,maxHp)=>mbSend('H'+Math.max(1,Math.min(9,Math.round(dmg/Math.max(1,maxHp)*18))));
 function pop(i,text){
+  if(i===0&&/^-\d+$/.test(text)&&F[0])mbHit(-Number(text),F[0].maxHp);
   const box=$('#f'+i),s=document.createElement('div');s.className='pop';s.textContent=text;box.append(s);
   setTimeout(()=>s.remove(),950);
   const sp=$('.bsprite',box);sp.classList.remove('hit');void sp.offsetWidth;sp.classList.add('hit');
@@ -1482,7 +1538,7 @@ function showResult(a,act,b){
   c.append(h(`<div class="res"><span class="rl">けっか</span>${L.map(t=>`<span>${t}</span>`).join('')}</div>`));
 }
 async function finish(w){
-  bs.over=true;bs.busy=false;refresh();
+  bs.over=true;bs.busy=false;refresh();mbSend(w===0?'W':'L');
   {const t=`${F[1-w].name}はたおれた…`;if(bs.logs.at(-1)!==t)log(t)}
   bScan.setOff(true);$('#basicBtn').disabled=true;
   todo($('#batTodo'),'勝負あり！');
@@ -1531,7 +1587,7 @@ function startBattle(){
   $('#vsBanner').hidden=true;
   buildBatCtl();$('#actCard').hidden=true;
   bs.dial=dialEl('battle');$('#batDial').replaceChildren(bs.dial);
-  go('battle');
+  go('battle');mbSend('S');
   F.forEach((f,i)=>drawSprite($('#f'+i+' .bsprite'),f,innerWidth<440?104:132));
   const t0=F[0].jobKey==='thief',t1=F[1].jobKey==='thief';
   bs.turn=Math.random()<(t0&&!t1?.75:t1&&!t0?.25:.5)?0:1;
@@ -1679,7 +1735,7 @@ function vsApplyState(m){
     Object.assign(bs,{over:false,busy:false,anim:false,logs:[],used:new Set([F[0].code,F[1].code]),best:{dmg:0,name:''},myMoves:0,oppNick:((vsPeer()||{}).nick||'')});vs.lastActNo=0;vs.act=null;
     buildBatCtl();$('#actCard').hidden=true;$('#vsBanner').hidden=true;
     bs.dial=dialEl('battle');$('#batDial').replaceChildren(bs.dial);
-    go('battle');F.forEach((f,i)=>drawSprite($('#f'+i+' .bsprite'),f,innerWidth<440?104:132));
+    go('battle');mbSend('S');F.forEach((f,i)=>drawSprite($('#f'+i+' .bsprite'),f,innerWidth<440?104:132));
   }else{
     /* ダメージや回復を表示してから、新しい数値にする */
     nf.forEach((f,i)=>{const d=f.hp-F[i].hp;if(i===1&&d<0&&vs.act&&vs.act.a===0&&bs.best&&-d>bs.best.dmg)bs.best={dmg:-d,name:vs.act.act.name};if(d<0){pop(i,String(d));const fld=$('#field');fld.classList.remove('shake');void fld.offsetWidth;fld.classList.add('shake');try{navigator.vibrate&&navigator.vibrate(40)}catch{}}else if(d>0)pop(i,'+'+d);
