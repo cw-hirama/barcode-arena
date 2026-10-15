@@ -497,6 +497,7 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
       <div class="mbbox" id="mbBox" hidden>
         <p class="mbstate" id="mbState" hidden><span class="mbdot"></span><span id="mbLbl">micro:bit をつなぐ</span></p>
         <div class="row"><button class="sub" id="mbUsb" hidden>micro:bit をUSBでつなぐ</button><button class="sub" id="mbBt" hidden>micro:bit をBluetoothでつなぐ</button><button class="sub" id="mbTest" hidden>光らせてみる</button><button class="sub" id="mbOff" hidden>切る</button></div>
+        <button class="link" id="mbAll" hidden>一覧に micro:bit が出ないときは、近くの Bluetooth 機器をぜんぶ表示</button>
         <p class="small" id="mbMsg" hidden></p>
       </div>
       <h3 id="mateHead">あなたの仲間 <small style="font-weight:700;font-size:12px;color:var(--muted)">タップでトレカ</small></h3>
@@ -1064,8 +1065,9 @@ $('#histBtn').onclick=()=>startHistory();
 $('#mbBox').hidden=false;
 if(!mbOk()){const m=$('#mbMsg');m.textContent=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'iPhone・iPad のブラウザは Bluetooth に対応していないことが多いです。つながらないときは、Bluefy などの Bluetooth 対応ブラウザアプリで開いてね':'このブラウザは Bluetooth に対応していないかもしれません。つながらないときは、パソコンか Android の Chrome / Edge で開いてね';m.hidden=false}
 else if(!mbUsbOk()){const m=$('#mbMsg');m.textContent='スマホは Bluetooth でつなげます（USB でつなぐのはパソコンだけ）';m.hidden=false}
-$('#mbUsb').hidden=!mbUsbOk();$('#mbBt').hidden=false; /* ここは mb より前に動くので、mbUI() は呼ばない */
+$('#mbUsb').hidden=!mbUsbOk();$('#mbBt').hidden=false;$('#mbAll').hidden=!mbBtOk(); /* ここは mb より前に動くので、mbUI() は呼ばない */
 $('#mbUsb').onclick=()=>{if(!mb.busy&&!mbOn())mbConnectUsb()};
+$('#mbAll').onclick=()=>{if(!mb.busy&&!mbOn()&&mbBtOk())mbConnectBt(true)};
 $('#mbBt').onclick=()=>{if(mb.busy||mbOn())return;if(!mbBtOk()){mbUI(/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'このブラウザでは Bluetooth が使えませんでした。iPhone・iPad では、App Store の「Bluefy」などの Bluetooth 対応ブラウザでこのページを開くと、つながることがあります':'このブラウザでは Bluetooth が使えませんでした。パソコンか Android の Chrome / Edge で開いてね');return}mbConnectBt()};
 $('#mbTest').onclick=()=>mbPlay(mbHitPat(9));
 $('#mbOff').onclick=()=>mbOffNow();
@@ -1395,14 +1397,14 @@ function mbUI(msg){
   const on=mbOn();$('#mbBox').classList.toggle('on',on);
   $('#mbLbl').textContent=on?(mb.kind==='usb'?'micro:bit とUSBでつながっています':`micro:bit とBluetoothでつながっています${mb.dev&&mb.dev.name?'（'+mb.dev.name.replace(/^BBC micro:bit\s*/,'').replace(/^\[|\]$/g,'')+'）':''}`):mb.busy?'つないでいます…':'micro:bit をつなぐ';
   $('#mbUsb').hidden=on||!mbUsbOk();$('#mbBt').hidden=on;$('#mbState').hidden=!on&&!mb.busy;
-  $('#mbTest').hidden=!on;$('#mbOff').hidden=!on;$('#mbUsb').disabled=$('#mbBt').disabled=mb.busy;
+  $('#mbTest').hidden=!on;$('#mbAll').hidden=on||!mbBtOk();$('#mbOff').hidden=!on;$('#mbUsb').disabled=$('#mbBt').disabled=mb.busy;
   const m=$('#mbMsg');if(msg!==undefined){m.textContent=msg;m.hidden=!msg}
 }
 function mbLost(){const was=mbOn();mb.ch=null;mb.writer=null;mb.port=null;mb.kind=null;mbUI(was?'micro:bit との接続が切れました。もう一度つないでね':'')}
-async function mbConnectBt(){
+async function mbConnectBt(all){
   mb.busy=true;mbUI('');
   try{
-    const dev=await navigator.bluetooth.requestDevice({filters:[{namePrefix:'BBC micro:bit'}],optionalServices:[MB_UART]});
+    const dev=await navigator.bluetooth.requestDevice(all?{acceptAllDevices:true,optionalServices:[MB_UART]}:{filters:[{namePrefix:'BBC micro:bit'},{namePrefix:'micro:bit'},{services:[MB_UART]}],optionalServices:[MB_UART]});
     mb.dev=dev;dev.addEventListener('gattserverdisconnected',()=>{if(mb.kind==='bt')mbLost()});
     const gatt=await dev.gatt.connect();
     const svc=await gatt.getPrimaryService(MB_UART);
@@ -1414,7 +1416,7 @@ async function mbConnectBt(){
   }catch(e){
     mb.busy=false;mb.ch=null;mb.kind=null;try{mb.dev&&mb.dev.gatt.connected&&mb.dev.gatt.disconnect()}catch{}
     const n=e&&e.name,t=String(e&&e.message||'');
-    mbUI(n==='NotFoundError'&&/cancel/i.test(t)?'':n==='SecurityError'||n==='NotAllowedError'?'このページからは Bluetooth を使えません。GitHub の公開ページ（https）を Chrome / Edge で開いてね':
+    mbUI(n==='NotFoundError'&&/cancel/i.test(t)?'一覧に出なかったときは、MakeCode の歯車→「プロジェクトの設定」で「No Pairing Required」をオンにして書きこみ直すか、下の「ぜんぶ表示」をためしてね':n==='SecurityError'||n==='NotAllowedError'?'このページからは Bluetooth を使えません。GitHub の公開ページ（https）を Chrome / Edge で開いてね':
       t==='nouart'||/service/i.test(t)?'micro:bit に「Bluetooth UART」のプログラムが入っていないようです。MakeCode のプログラムを書きこんでね':
       n==='NotFoundError'?'micro:bit が見つかりませんでした。電源と、プログラムが入っているかを確かめてね':'つなげませんでした。micro:bit をリセットして、もう一度ためしてね');
   }
