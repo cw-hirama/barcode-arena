@@ -1062,11 +1062,11 @@ $('#rulesBtn').onclick=()=>startRules();
 $('#manBtn').onclick=()=>startManual();
 $('#histBtn').onclick=()=>startHistory();
 $('#mbBox').hidden=false;
-if(!mbOk()){const m=$('#mbMsg');m.textContent=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'micro:bit とつなぐ機能は、iPhone・iPad では使えません（Bluetooth に対応していないため）。パソコンか Android の Chrome / Edge で開いてね':'micro:bit とつなぐ機能は、このブラウザでは使えません。パソコンか Android の Chrome / Edge で開いてね';m.hidden=false}
+if(!mbOk()){const m=$('#mbMsg');m.textContent=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'iPhone・iPad のブラウザは Bluetooth に対応していないことが多いです。つながらないときは、Bluefy などの Bluetooth 対応ブラウザアプリで開いてね':'このブラウザは Bluetooth に対応していないかもしれません。つながらないときは、パソコンか Android の Chrome / Edge で開いてね';m.hidden=false}
 else if(!mbUsbOk()){const m=$('#mbMsg');m.textContent='スマホは Bluetooth でつなげます（USB でつなぐのはパソコンだけ）';m.hidden=false}
-$('#mbUsb').hidden=!mbUsbOk();$('#mbBt').hidden=!mbBtOk(); /* ここは mb より前に動くので、mbUI() は呼ばない */
+$('#mbUsb').hidden=!mbUsbOk();$('#mbBt').hidden=false; /* ここは mb より前に動くので、mbUI() は呼ばない */
 $('#mbUsb').onclick=()=>{if(!mb.busy&&!mbOn())mbConnectUsb()};
-$('#mbBt').onclick=()=>{if(!mb.busy&&!mbOn())mbConnectBt()};
+$('#mbBt').onclick=()=>{if(mb.busy||mbOn())return;if(!mbBtOk()){mbUI(/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'このブラウザでは Bluetooth が使えませんでした。iPhone・iPad では、App Store の「Bluefy」などの Bluetooth 対応ブラウザでこのページを開くと、つながることがあります':'このブラウザでは Bluetooth が使えませんでした。パソコンか Android の Chrome / Edge で開いてね');return}mbConnectBt()};
 $('#mbTest').onclick=()=>mbPlay(mbHitPat(9));
 $('#mbOff').onclick=()=>mbOffNow();
 
@@ -1394,7 +1394,7 @@ const mbOn=()=>!!(mb.ch||mb.writer);
 function mbUI(msg){
   const on=mbOn();$('#mbBox').classList.toggle('on',on);
   $('#mbLbl').textContent=on?(mb.kind==='usb'?'micro:bit とUSBでつながっています':`micro:bit とBluetoothでつながっています${mb.dev&&mb.dev.name?'（'+mb.dev.name.replace(/^BBC micro:bit\s*/,'').replace(/^\[|\]$/g,'')+'）':''}`):mb.busy?'つないでいます…':'micro:bit をつなぐ';
-  $('#mbUsb').hidden=on||!mbUsbOk();$('#mbBt').hidden=on||!mbBtOk();$('#mbState').hidden=!on&&!mb.busy;
+  $('#mbUsb').hidden=on||!mbUsbOk();$('#mbBt').hidden=on;$('#mbState').hidden=!on&&!mb.busy;
   $('#mbTest').hidden=!on;$('#mbOff').hidden=!on;$('#mbUsb').disabled=$('#mbBt').disabled=mb.busy;
   const m=$('#mbMsg');if(msg!==undefined){m.textContent=msg;m.hidden=!msg}
 }
