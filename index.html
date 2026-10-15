@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <title>バーコードアリーナ</title>
 </head>
 <body>
@@ -321,6 +323,23 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
 .rank .nm span{font-size:12px;color:var(--muted)}
 .rank .lvv{font:900 17px var(--f-round);font-variant-numeric:tabular-nums;color:var(--navy)}
 .empty{background:#ffffff88;border-radius:16px;padding:16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px}
+/* バトル履歴 */
+.hsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}
+.hsum .box{background:var(--card);border-radius:18px;padding:12px 14px;box-shadow:0 4px 14px #2b2f5514;display:flex;flex-direction:column;gap:4px}
+.hsum .box b{font-weight:900;font-size:13px;color:var(--muted)}
+.hsum .box .big2{font:900 24px var(--f-round);font-variant-numeric:tabular-nums}
+.hsum .box .rate{height:8px;border-radius:999px;background:#ffd9dd;overflow:hidden}
+.hsum .box .rate i{display:block;height:100%;background:var(--hp-hi)}
+.hsum .box small{font-size:12px;color:var(--muted)}
+.hlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.hitem{background:var(--card);border-radius:16px;padding:10px 12px;box-shadow:0 3px 10px #2b2f5512;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center}
+.hitem .hres{grid-row:span 2;font:900 13px var(--f-round);color:#fff;border-radius:12px;padding:8px 6px;text-align:center;min-width:58px;background:var(--hp-hi);margin:0;animation:none;box-shadow:none}
+.hitem .hres.lose{background:#9aa1bd}
+.hitem .vsline{font-weight:900;font-size:14.5px;min-width:0;overflow-wrap:anywhere}
+.hitem .vsline em{font-style:normal;color:var(--muted);font-weight:700;margin:0 4px}
+.hitem .meta{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px;min-width:0}
+.hitem .tagm{font-weight:900;font-size:11px;color:#fff;background:var(--navy);border-radius:999px;padding:1px 8px}
+.hitem .tagm.net{background:var(--blue)}
 /* 友だち対戦（別の端末） */
 .vschoice{display:grid;gap:10px}
 .vscode{font:900 40px var(--f-round);letter-spacing:.18em;text-align:center;color:var(--navy);background:var(--card);border-radius:18px;padding:10px 8px 6px;box-shadow:0 4px 14px #2b2f5514;font-variant-numeric:tabular-nums}
@@ -466,7 +485,8 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
       <div class="menu" id="homeMenu"></div>
       <div class="row" id="onlineRow" hidden><button class="sub" id="friendsBtn">ともだち</button><button class="sub" id="rankBtn">ランキング</button></div>
       <button class="sub" id="goOnline" hidden>サーバーにつないで、友だちやランキングで遊ぶ</button>
-      <div class="row"><button class="sub" id="manBtn">たたかい方マニュアル</button><button class="sub" id="rulesBtn">読み方・しらべる</button></div>
+      <div class="row"><button class="sub" id="histBtn">バトル履歴</button><button class="sub" id="manBtn">たたかい方マニュアル</button></div>
+      <button class="sub" id="rulesBtn">バーコードの読み方・しらべる</button>
       <h3 id="mateHead">あなたの仲間 <small style="font-weight:700;font-size:12px;color:var(--muted)">タップでトレカ</small></h3>
       <ul class="list" id="mateList"></ul>
       <button class="link" id="howBtn">あそびかたを見る</button>
@@ -582,6 +602,12 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
       <div class="screen" id="cardBody"></div>
     </section>
 
+    <!-- HISTORY -->
+    <section class="screen" data-screen="history" hidden>
+      <div class="bar"><button class="back" data-home>← ホーム</button><h2>バトル履歴</h2></div>
+      <div class="screen" id="histBody"></div>
+    </section>
+
     <!-- MANUAL -->
     <section class="screen" data-screen="manual" hidden>
       <div class="bar"><button class="back" data-home>← ホーム</button><h2>たたかい方マニュアル</h2></div>
@@ -599,8 +625,8 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
   <p class="foot" id="foot">データはこのスマホのブラウザに保存されます。ブラウザのデータを消すと仲間も消えます。</p>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js" integrity="sha384-BzBxP10ZE72aitqj5UMmUsbKFliP/DZqA8Wq+BNNhlIJDGoEd1tpkMYXOg9+n6sB" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <script>
 (() => {
 const $ = (s, el = document) => el.querySelector(s);
@@ -615,7 +641,7 @@ const store={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??
 const CONFIG={
   SUPABASE_URL:'https://mnypslgxifullrjuzton.supabase.co',       // 例 'https://abcdefghijkl.supabase.co'
   SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ueXBzbGd4aWZ1bGxyanV6dG9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2OTUzMDMsImV4cCI6MjEwNzI3MTMwM30.QQeHyRlc_bZk1dYD0ZDF1WdsQ-qrYOAT9BNc2fdWjcI',  // 例 'eyJhbGciOi...'（anon public キー。公開しても大丈夫なキー）
-  GOOGLE_LOGIN:false     // Googleログインの設定（手順書の手順7）が終わったら true にする
+  GOOGLE_LOGIN:'auto'    // 'auto'＝SupabaseでGoogleをオンにすると自動でボタンが出る（手順書の手順7）。false で常に隠す
 };
 const SERVER=!!(CONFIG.SUPABASE_URL&&CONFIG.SUPABASE_ANON_KEY&&window.supabase);
 const LOCAL_ONLY=(()=>{try{return localStorage.getItem('ba-mode')==='"local"'}catch{return false}})();
@@ -626,8 +652,14 @@ const AUTH_ERR=(()=>{try{const q=new URLSearchParams(location.search),hs=new URL
 /* URLの後ろに /rest/v1/ などが付いていても動くように、プロジェクトのURLだけにそろえる */
 const SB_URL=String(CONFIG.SUPABASE_URL).trim().replace(/\/(rest|auth)\/v1.*$/,'').replace(/\/+$/,'');
 const sb=ONLINE?window.supabase.createClient(SB_URL,CONFIG.SUPABASE_ANON_KEY.trim(),{auth:{flowType:'pkce',detectSessionInUrl:true,persistSession:true}}):null;
-const SYNC_KEYS=['ba-player','ba-units','ba-record','ba-found','ba-meal','ba-tut','ba-vsrec'];
-const net={ready:false,needWelcome:false,welcomeMode:'start',uid:null,me:null,user:null,offline:false,incoming:0};
+/* SupabaseでGoogleログインがオンになっているかを、サーバーの公開設定から調べる */
+async function detectGoogle(){
+  if(!ONLINE||CONFIG.GOOGLE_LOGIN===false)return false;
+  if(CONFIG.GOOGLE_LOGIN===true)return true;
+  try{const r=await fetch(SB_URL+'/auth/v1/settings',{headers:{apikey:CONFIG.SUPABASE_ANON_KEY.trim()}});if(!r.ok)return false;const j=await r.json();return !!(j&&j.external&&j.external.google)}catch{return false}
+}
+const SYNC_KEYS=['ba-player','ba-units','ba-record','ba-found','ba-meal','ba-tut','ba-vsrec','ba-history'];
+const net={google:false,ready:false,needWelcome:false,welcomeMode:'start',uid:null,me:null,user:null,offline:false,incoming:0};
 let applying=false,syncT=null;
 function markDirty(){if(applying)return;try{localStorage.setItem('ba-dirty-at',String(Date.now()))}catch{}if(ONLINE&&net.ready){clearTimeout(syncT);syncT=setTimeout(()=>{syncT=null;pushSave()},1500)}}
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1016,6 +1048,7 @@ function home(){
 $('#howBtn').onclick=()=>startTut();
 $('#rulesBtn').onclick=()=>startRules();
 $('#manBtn').onclick=()=>startManual();
+$('#histBtn').onclick=()=>startHistory();
 
 /* ---------- TUTORIAL ---------- */
 const TUT=[
@@ -1347,6 +1380,7 @@ async function hit(a,d,{mult=1,defF=.5,sure=false,magic=false}={}){
   const crit=Math.random()<(CRIT[A.jobKey]??.1);if(crit)dmg*=1.7;
   if(D.guard)dmg*=D.jobKey==='knight'?Math.min(.25,D.guard):D.guard;
   dmg=Math.round(dmg);D.hp-=dmg;
+  if(a===0&&bs.best&&dmg>bs.best.dmg)bs.best={dmg,name:bs.curAct||''};
   const fld=$('#field');fld.classList.remove('shake');void fld.offsetWidth;fld.classList.add('shake');
   try{navigator.vibrate&&navigator.vibrate(crit?[30,40,60]:40)}catch{}
   log(`${crit?'会心の一撃！ ':''}${D.name}に${dmg}のダメージ`);
@@ -1389,6 +1423,7 @@ async function doTurn(a,code){
   let act;
   if(code){bs.used.add(code);act=makeMove(code,A);beep()}
   else act=basicMove();
+  bs.curAct=act.name;if(a===0)bs.myMoves=(bs.myMoves||0)+1;
   if(bs.mode==='net')vsSend({t:'act',to:bs.peerSid,bid:bs.bid,turnNo:bs.turnNo,a,code:code||null});
   showAct(act,label(a));
   if(a===0)discoverMove(act);
@@ -1465,11 +1500,14 @@ async function finish(w){
     line+=`（友だち対戦 ${r.w}勝 ${r.l}敗）`;
   }
   const msgs=gainExp(exp);
+  addHistory({t:Date.now(),mode:bs.mode,win:w===0,exp,turns:bs.myMoves||0,best:bs.best&&bs.best.dmg?bs.best:null,
+    me:{n:F[0].name,j:F[0].jobKey,lv:F[0].lv,c:F[0].code},op:{n:F[1].name,j:F[1].jobKey,lv:F[1].lv,c:F[1].code,who:bs.mode==='net'?String(bs.oppNick||'').slice(0,10):''}});
   await wait(1200);
   $('#resBody').classList.toggle('lose',w!==0);
   $('#resAgain').textContent=bs.mode==='net'?'同じあいてと、もう一度':'同じ仲間でもう一度';
   $('#resBody').innerHTML=`<div class="rt">${title}</div><p>${esc(line)}</p><p>経験値を${exp}もらった</p>${msgs.map(m=>`<p><b>${m}</b></p>`).join('')}${w!==0?'<button class="link" id="resMan">勝ち方のヒント：たたかい方マニュアル</button>':''}`;
   $('#resMan')&&($('#resMan').onclick=()=>startManual());
+  {const hb=h('<button class="link">バトル履歴を見る</button>');hb.onclick=()=>startHistory();$('#resBody').append(hb)}
   if(msgs.length)fanfare();
   go('result');
 }
@@ -1489,7 +1527,7 @@ function startBattle(){
   if(bs.mode==='net'){bs.peerSid=vsPeer().sid;bs.bid=vs.sid+'-'+Date.now().toString(36)}
   F[0]=prepF(fighter(prep.u[0]));F[1]=prepF(fighter(prep.u[1]));
   if(bs.mode==='cpu'&&F[1].lv<F[0].lv){cpuLevelUp(F[1],F[0].lv);F[1].baseSt=F[1].st}
-  Object.assign(bs,{over:false,busy:false,anim:false,turnNo:1,logs:[],used:new Set([F[0].code,F[1].code])});
+  Object.assign(bs,{over:false,busy:false,anim:false,turnNo:1,logs:[],used:new Set([F[0].code,F[1].code]),best:{dmg:0,name:''},myMoves:0,oppNick:bs.mode==='net'?((vsPeer()||{}).nick||''):'CPU'});
   $('#vsBanner').hidden=true;
   buildBatCtl();$('#actCard').hidden=true;
   bs.dial=dialEl('battle');$('#batDial').replaceChildren(bs.dial);
@@ -1522,7 +1560,7 @@ function sumToUnit(s){
   if(!Number.isInteger(s.lv)||s.lv<1||s.lv>MAXLV||![s.hp,s.st,s.df].every(ok))return null;
   return{code:s.code,job:s.job,name:s.name.slice(0,10),lv:s.lv,hp:s.hp,st:s.st,df:s.df,fed:[]};
 }
-function vsPresences(){if(!vs.ch)return[];try{return Object.values(vs.ch.presenceState()).flat()}catch{return[]}}
+function vsPresences(){if(!vs.ch)return[];try{return Object.values(vs.ch.presenceState()).flat().filter(p=>p&&typeof p==='object'&&typeof p.sid==='string').map(p=>({...p,nick:String(p.nick||'').slice(0,10)}))}catch{return[]}}
 function vsPeer(){
   const ps=vsPresences().filter(p=>p.sid!==vs.sid);
   if(vs.role==='host')return ps.filter(p=>p.role==='guest').sort((a,b)=>a.at-b.at)[0]||null;
@@ -1604,6 +1642,7 @@ function vsOnMsg(m){
   if(!host||m.from!==host.sid||(m.to&&m.to!==vs.sid)||vs.status==='いっぱい')return;
   vs.lastMsg=Date.now();
   if(m.t==='act'){
+    if((m.a!==0&&m.a!==1)||!Number.isInteger(m.turnNo))return;
     if(m.bid!==vs.bid||m.turnNo<=vs.lastActNo||!F[0]||bs.over)return;vs.lastActNo=m.turnNo;
     const aL=1-m.a,A=F[aL];
     const code=m.code!=null?parseCode(m.code).code:null;
@@ -1612,16 +1651,22 @@ function vsOnMsg(m){
     bs.busy=true;bs.sending=false;clearInterval(vs.retry);vs.retry=null;
     if(code)beep();
     showAct(act,label(aL));if(aL===0)discoverMove(act);
+    if(aL===0)bs.myMoves=(bs.myMoves||0)+1;
     log(`${A.name}の${act.name}！`);setPanel();
     return;
   }
   if(m.t==='state')vsApplyState(m);
 }
 function vsApplyState(m){
-  if(!Array.isArray(m.F)||m.F.length!==2)return;
+  if(!Array.isArray(m.F)||m.F.length!==2||!Number.isInteger(m.turnNo)||(m.turn!==0&&m.turn!==1))return;
   const mk=s=>{const u=sumToUnit({code:s.code,job:s.jobKey,name:s.name,lv:s.lv,hp:0,st:0,df:0});if(!u)return null;
     return{...fighter(u),maxHp:+s.maxHp||1,hp:+s.hp||0,st:+s.st||0,baseSt:+s.baseSt||0,df:+s.df||0,guard:typeof s.guard==='number'&&s.guard>0&&s.guard<1?s.guard:false}};
   const nf=[mk(m.F[1]),mk(m.F[0])];if(!nf[0]||!nf[1])return;
+  /* 自分とあいての仲間が、部屋で見せ合ったものと同じかを確かめる（すりかえ防止） */
+  const same=(x,u)=>!!u&&x.code===u.code&&x.jobKey===u.jobKey&&x.lv===u.lv&&x.maxHp===u.maxHp;
+  const myU=vs.base&&sumToUnit(vs.base.f),hostP=vsPeer(),opU=hostP&&sumToUnit(hostP.f);
+  if(!same(nf[0],myU&&fighter(myU))||!same(nf[1],opU&&fighter(opU)))return;
+  nf.forEach(f=>{f.hp=Math.max(0,Math.min(f.hp,f.maxHp))});
   const fresh=m.bid!==vs.bid||bs.mode!=='net'||bs.host||!F[0];
   if(fresh&&m.over)return;           /* 終わったバトルの結果を、あとから受け取らない */
   if(!fresh&&bs.over)return;         /* 決着したあとに届いた重複は無視（経験値の二重どり防止） */
@@ -1631,13 +1676,13 @@ function vsApplyState(m){
       if(!vs.ch||bs.mode!=='net'||bs.host||bs.over)return;
       if((bs.turn===1||bs.sending)&&Date.now()-vs.lastMsg>8000){vs.lastMsg=Date.now();vsSend({t:'hello'})} /* 長く何も届かないときは、いまの状態をもらう */
     },4000);
-    Object.assign(bs,{over:false,busy:false,anim:false,logs:[],used:new Set([F[0].code,F[1].code])});vs.lastActNo=0;vs.act=null;
+    Object.assign(bs,{over:false,busy:false,anim:false,logs:[],used:new Set([F[0].code,F[1].code]),best:{dmg:0,name:''},myMoves:0,oppNick:((vsPeer()||{}).nick||'')});vs.lastActNo=0;vs.act=null;
     buildBatCtl();$('#actCard').hidden=true;$('#vsBanner').hidden=true;
     bs.dial=dialEl('battle');$('#batDial').replaceChildren(bs.dial);
     go('battle');F.forEach((f,i)=>drawSprite($('#f'+i+' .bsprite'),f,innerWidth<440?104:132));
   }else{
     /* ダメージや回復を表示してから、新しい数値にする */
-    nf.forEach((f,i)=>{const d=f.hp-F[i].hp;if(d<0){pop(i,String(d));const fld=$('#field');fld.classList.remove('shake');void fld.offsetWidth;fld.classList.add('shake');try{navigator.vibrate&&navigator.vibrate(40)}catch{}}else if(d>0)pop(i,'+'+d);
+    nf.forEach((f,i)=>{const d=f.hp-F[i].hp;if(i===1&&d<0&&vs.act&&vs.act.a===0&&bs.best&&-d>bs.best.dmg)bs.best={dmg:-d,name:vs.act.act.name};if(d<0){pop(i,String(d));const fld=$('#field');fld.classList.remove('shake');void fld.offsetWidth;fld.classList.add('shake');try{navigator.vibrate&&navigator.vibrate(40)}catch{}}else if(d>0)pop(i,'+'+d);
       Object.assign(F[i],{hp:f.hp,st:f.st,baseSt:f.baseSt,df:f.df,guard:f.guard,maxHp:f.maxHp,lv:f.lv})});
   }
   bs.logs=Array.isArray(m.logs)?m.logs.map(String).slice(-5):[];
@@ -1800,6 +1845,38 @@ function renderFeed(){
   body.append(cardBox,mealBox,dial,cap,sc,fullBox,pv,logBox);
   if(!drawMeal())drawFull();
   const done=h('<button class="sub">おわる（ホームへ）</button>');done.onclick=()=>home();body.append(done);
+}
+
+/* ---------- バトル履歴（新しい順に50件。サーバーにも保存される） ---------- */
+const HIST_MAX=50;
+function addHistory(e){
+  let hs=store.get('ba-history',[]);if(!Array.isArray(hs))hs=[];
+  hs.unshift(e);store.set('ba-history',hs.slice(0,HIST_MAX));
+}
+function startHistory(){renderHistory();go('history')}
+function renderHistory(){
+  const b=$('#histBody');b.innerHTML='';
+  let hs=store.get('ba-history',[]);if(!Array.isArray(hs))hs=[];
+  hs=hs.filter(x=>x&&x.me&&x.op&&JOBS[x.me.j]&&JOBS[x.op.j]);
+  const rc=store.get('ba-record',{w:0,l:0}),rv=store.get('ba-vsrec',{w:0,l:0});
+  const box=(title,r0)=>{const r={w:Math.max(0,Math.floor(Number(r0&&r0.w))||0),l:Math.max(0,Math.floor(Number(r0&&r0.l))||0)},n=r.w+r.l,pct=n?Math.round(r.w/n*100):0;
+    return `<div class="box"><b>${title}</b><span class="big2">${r.w}勝 ${r.l}敗</span><span class="rate"><i style="width:${pct}%"></i></span><small>${n?`勝率 ${pct}%`:'まだ戦っていません'}</small></div>`};
+  b.append(h(`<div class="hsum">${box('CPU戦',rc)}${box('友だち対戦',rv)}</div>`));
+  /* 仲間ごとの成績 */
+  const per={};hs.forEach(x=>{const k=x.me.c+'|'+x.me.n;(per[k]=per[k]||{n:x.me.n,w:0,l:0});x.win?per[k].w++:per[k].l++});
+  const top=Object.values(per).sort((a,b)=>(b.w+b.l)-(a.w+a.l)).slice(0,4);
+  if(top.length)b.append(h(`<p class="small" style="margin:0">仲間ごと（最近${hs.length}戦）：${top.map(p=>`${esc(p.n)} ${p.w}勝${p.l}敗`).join('　')}</p>`));
+  if(!hs.length){b.append(h('<div class="empty">まだバトルの記録がありません。バトルすると、ここに残ります</div>'));return}
+  const ul=h('<ul class="hlist"></ul>');
+  const fmt=t=>{const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
+  hs.forEach(x=>{
+    const li=h(`<li class="hitem"><p class="hres ${x.win?'':'lose'}">${x.win?'WIN':'LOSE'}</p>
+      <div class="vsline">${esc(x.me.n)} Lv.${Number(x.me.lv)||1}<em>vs</em>${esc(x.op.n)} Lv.${Number(x.op.lv)||1}</div>
+      <div class="meta"><span class="tagm ${x.mode==='net'?'net':''}">${x.mode==='net'?'友だち':'CPU'}</span>${x.mode==='net'&&x.op.who?`<span>あいて：${esc(x.op.who)}</span>`:''}<span>${fmt(x.t)}</span><span>${Number(x.turns)||0}手</span>${x.best?`<span>いちばんの一撃：${esc(x.best.name)} ${Number(x.best.dmg)||0}</span>`:''}<span>経験値+${Number(x.exp)||0}</span></div></li>`);
+    ul.append(li);
+  });
+  b.append(ul);
+  b.append(h(`<p class="small" style="margin:0;text-align:center">新しい順に${HIST_MAX}件まで残ります${ONLINE?'。サーバーにも保存されるので、Googleでログインすれば別の端末でも見られます':''}</p>`));
 }
 
 /* ---------- MANUAL（たたかい方マニュアル） ---------- */
@@ -2045,7 +2122,7 @@ async function saveFile(name,data,status){
     status(c==='declined'?'保存をやめました':c==='rate_limited'?'少し待ってから、もう一度押してね':c==='extension_not_enabled'?'この画面ではPDFを保存できません。画像で保存して印刷してね':'保存できませんでした。カードの画像を長押しして保存してね')}
 }
 let jspdfP=null;
-function loadJsPDF(){if(window.jspdf)return Promise.resolve();jspdfP=jspdfP||new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';sc.onload=res;sc.onerror=rej;document.head.append(sc)});return jspdfP}
+function loadJsPDF(){if(window.jspdf)return Promise.resolve();jspdfP=jspdfP||new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';sc.integrity='sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk';sc.crossOrigin='anonymous';sc.onload=res;sc.onerror=e=>{jspdfP=null;sc.remove();rej(e)};document.head.append(sc)});return jspdfP}
 async function cardPDF(list){
   await loadJsPDF();
   const {jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4'});
@@ -2212,7 +2289,7 @@ function showWelcome(){
   $('#wLead').textContent=nickOnly?'さいごに、ゲームの中で使うニックネームを決めてね。':'遊び方をえらんでね。あとから変えることもできます。';
   $('#wStartLbl').textContent=nickOnly?'このニックネームではじめる':'ニックネームではじめる';
   $('#wStartSub').hidden=nickOnly;
-  $('#wSocial').hidden=nickOnly||!CONFIG.GOOGLE_LOGIN;
+  $('#wSocial').hidden=nickOnly||!net.google;
   $('#wMoveBox').hidden=nickOnly;$('#wLocal').hidden=nickOnly;
   if(authNotice==='cancelled')say('Googleログインをやめました');
   else if(authNotice==='login-failed')say('Googleでログインできませんでした。もう一度ためすか、ニックネームではじめてね');
@@ -2266,7 +2343,7 @@ function showChoose(cloud){
 function accountBox(say){
   const u=net.user,g=isGoogle(u);
   const box=h(`<div class="share"><h4>アカウント</h4><div class="acct"><div class="who">${g?'Googleでログイン中':'ゲスト（このブラウザに記憶）'}<small>${g?esc(maskMail(u.email))||'Googleアカウント':'ブラウザのデータを消すと入れなくなります'}</small></div></div></div>`);
-  if(!g&&CONFIG.GOOGLE_LOGIN){
+  if(!g&&net.google){
     const lk=h('<button class="gbtn"><span>Googleと連携してデータを守る</span></button>');
     lk.prepend(h($('#wGoogle .g').outerHTML));
     lk.onclick=async()=>{lk.disabled=true;say('Googleのページへ移動します…',true);try{await googleLink()}catch{say('連携の準備ができていません（管理者の人は手順書の手順7を確認してね）');lk.disabled=false}};
@@ -2336,13 +2413,13 @@ async function renderFriends(){
     const rows=data||[],inc=rows.filter(r=>r.incoming),fr=rows.filter(r=>r.status==='accepted'),out=rows.filter(r=>r.status==='pending'&&!r.incoming);
     net.incoming=inc.length;
     if(inc.length){listBox.append(h(`<h3>届いた申請<span class="badge-n">${inc.length}</span></h3>`));const ul=h('<ul class="flist"></ul>');
-      inc.forEach(r=>{const li=h(`<li class="fcard"><div class="hd"><b>${esc(r.nickname)}</b><span>プレイヤー Lv.${r.lv}</span></div><div class="acts"><button class="big center" style="padding:10px;font-size:16px">友だちになる</button><button class="sub">ことわる</button></div></li>`);
+      inc.forEach(r=>{const li=h(`<li class="fcard"><div class="hd"><b>${esc(r.nickname)}</b><span>プレイヤー Lv.${Number(r.lv)||1}</span></div><div class="acts"><button class="big center" style="padding:10px;font-size:16px">友だちになる</button><button class="sub">ことわる</button></div></li>`);
         const [y,n]=$$('button',li);y.onclick=async()=>{await sb.rpc('answer_friend',{p_other:r.id,p_accept:true});loadList()};n.onclick=async()=>{await sb.rpc('answer_friend',{p_other:r.id,p_accept:false});loadList()};ul.append(li)});
       listBox.append(ul)}
     listBox.append(h(`<h3>友だち ${fr.length}人</h3>`));
     if(!fr.length)listBox.append(h('<div class="empty">まだ友だちがいません。フレンドコードを交換しよう</div>'));
     else{const ul=h('<ul class="flist"></ul>');
-      fr.forEach(r=>{const li=h(`<li class="fcard"><div class="hd"><b>${esc(r.nickname)}</b><span>プレイヤー Lv.${r.lv} · ${r.wins}勝 · ${timeAgo(r.updated_at)}</span></div><div class="mons"></div></li>`);
+      fr.forEach(r=>{const li=h(`<li class="fcard"><div class="hd"><b>${esc(r.nickname)}</b><span>プレイヤー Lv.${Number(r.lv)||1} · ${Number(r.wins)||0}勝 · ${timeAgo(r.updated_at)}</span></div><div class="mons"></div></li>`);
         const ms=safeMates(r.mates);const box=$('.mons',li);if(ms.length)ms.forEach(m=>box.append(monMini(m)));else box.append(h('<span class="small">まだ仲間がいません</span>'));ul.append(li)});
       listBox.append(ul)}
     if(out.length){listBox.append(h('<h3>申請中</h3>'));const ul=h('<ul class="flist"></ul>');
@@ -2374,7 +2451,7 @@ async function renderRanking(){
   const ul=h('<ul class="rank"></ul>');
   rows.forEach(r=>{
     const top=safeMates(r.mates).sort((a,b)=>(b.lv||0)-(a.lv||0))[0];
-    const li=h(`<li class="${r.is_me?'me':''}"><span class="rk">${r.rank}</span><span class="tile" style="--h:200"></span><span class="nm"><b>${esc(r.nickname)}${r.is_me?'（あなた）':''}</b><span>${r.wins}勝${top?` · エース ${esc(String(top.n).slice(0,10))} Lv.${Number(top.lv)||1}`:''}</span></span><span class="lvv">Lv.${r.lv}</span></li>`);
+    const li=h(`<li class="${r.is_me?'me':''}"><span class="rk">${Number(r.rank)||'-'}</span><span class="tile" style="--h:200"></span><span class="nm"><b>${esc(r.nickname)}${r.is_me?'（あなた）':''}</b><span>${Number(r.wins)||0}勝${top?` · エース ${esc(String(top.n).slice(0,10))} Lv.${Number(top.lv)||1}`:''}</span></span><span class="lvv">Lv.${Number(r.lv)||1}</span></li>`);
     if(top){const f=fighter({code:top.c,job:top.j,name:top.n,lv:top.lv});const t=$('.tile',li);t.style.setProperty('--h',hueOf(f));const cv=document.createElement('canvas');t.append(cv);drawSprite(cv,f,46)}
     ul.append(li);
   });
@@ -2390,6 +2467,7 @@ $('#goOnline').onclick=()=>{try{localStorage.removeItem('ba-mode')}catch{}locati
 (async()=>{
   if(!ONLINE){if(!openSharedCard())enterGame();return}
   const shared=openSharedCard();
+  detectGoogle().then(g=>{net.google=g;if(g&&!$('[data-screen="welcome"]').hidden&&net.welcomeMode!=='nickname')$('#wSocial').hidden=false;if(g&&!$('[data-screen="friends"]').hidden)renderFriends()});
   await onlineBoot();
   if(net.choose){showChoose(net.choose);return}
   if(authNotice==='linked'){authNotice=null;toast('Googleと連携しました！','スマホを替えても、Googleでログインすれば同じデータで遊べます')}
