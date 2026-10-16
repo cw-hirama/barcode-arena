@@ -1439,6 +1439,7 @@ async function mbConnectUsb(){
 }
 if(mbUsbOk())navigator.serial.addEventListener('disconnect',ev=>{if(mb.kind==='usb'&&(!ev.target||ev.target===mb.port))mbLost()});
 async function mbOffNow(){
+  mb.pat++;mbWrite('0,0,0');try{await mb.q}catch{} /* 切る前に消す */
   const k=mb.kind,d=mb.dev,w=mb.writer,p=mb.port;mb.ch=null;mb.writer=null;mb.port=null;mb.kind=null;mbUI('切りました');
   if(k==='bt'){try{d&&d.gatt.connected&&d.gatt.disconnect()}catch{}}
   if(k==='usb'){try{await mb.q}catch{}try{w&&w.releaseLock()}catch{}try{p&&await p.close()}catch{}}
@@ -1455,19 +1456,30 @@ function mbWrite(line){
 /* 色相（0〜360）・明るさ（0〜1）から [赤,緑,青] をつくる */
 function mbHsv(h,v){h=((h%360)+360)%360;const c=v,x=c*(1-Math.abs((h/60)%2-1)),k=Math.floor(h/60),
   t=[[c,x,0],[x,c,0],[0,c,x],[0,x,c],[x,0,c],[c,0,x]][k];return t.map(n=>Math.round(n*255))}
-/* 虹色のグラデーション：色相を少しずつ回す（約3秒・2周） */
-function mbRainbow(){const o=[];for(let i=0;i<=60;i++)o.push([...mbHsv(i*12,1),50]);o.push([255,255,255,200]);return o}
 const MB_PAT={
   T:[[200,200,200,150],[0,0,0,100],[200,200,200,150]],                 /* テスト：白で2回 */
   S:[[0,70,255,300]],                                                    /* バトル開始：青 */
-  E:null                                                                 /* バトル終了：虹色（mbRainbow） */
+  E:null                                                                 /* バトル終了：虹色（mbRainbowLoop） */
 };
-/* ダメージの強さ p＝1〜9 で、色・明るさ・点滅の回数を変える
-   1〜2 黄色 → 3〜4 オレンジ → 5〜6 赤 → 7〜8 ピンク → 9 むらさき＋白いフラッシュ */
+/* いつも弱く光っている色（つないでいる間ずっと） */
+const MB_BASE=[10,18,40];
+/* 色a から 色b へ、t（0〜1）の割合で近づけた色 */
+const mbMix=(a,b,t)=>a.map((x,i)=>Math.round(x+(b[i]-x)*t));
+/* ピカーッ：一瞬で強く光って（白い芯→ダメージの色）、ゆっくり弱い光にもどる */
+function mbFlare(col,peak,ms,white){
+  const top=col.map(x=>Math.round(x*peak)),o=[];
+  if(white)o.push([255,255,255,45]);                     /* 大ダメージは白い芯から */
+  o.push([...mbMix(MB_BASE,top,.6),25],[...top,70]);      /* 立ち上がり → いちばん明るい */
+  const n=Math.max(8,Math.round(ms/35));
+  for(let i=1;i<=n;i++){const t=i/n;o.push([...mbMix(top,MB_BASE,1-Math.pow(1-t,2.2)),35])} /* じわっと消えていく */
+  return o;
+}
+/* ダメージの強さ p＝1〜9 で、色・明るさ・光っている長さを変える
+   1〜2 黄色 → 3〜4 オレンジ → 5〜6 赤 → 7〜8 ピンク → 9 むらさき（大きいほど明るく、長く、白い芯つき） */
 function mbHitPat(p){
-  const hue=55-p*11,v=Math.min(1,.45+p*.065),n=p>=7?3:p>=4?2:1,col=mbHsv(hue,v),o=[];
-  for(let i=0;i<n;i++)o.push([...col,90],[0,0,0,60]);
-  if(p>=9)o.push([255,255,255,120],[0,0,0,40]);
+  const col=mbHsv(55-p*11,1),peak=Math.min(1,.55+p*.05),ms=350+p*70;
+  let o=mbFlare(col,peak,ms,p>=6);
+  if(p>=7)o=o.concat(mbFlare(col,peak*.7,ms*.6,false));  /* とても大きいときは、もう1回 */
   return o;
 }
 async function mbPlay(steps,{after=false}={}){
@@ -1476,11 +1488,24 @@ async function mbPlay(steps,{after=false}={}){
   const id=++mb.pat; /* 新しい光り方が来たら、前のは途中でやめる */
   const run=(async()=>{
     for(const [r,g,b,ms] of steps){if(id!==mb.pat||!mbOn())return;mbWrite(`${r},${g},${b}`);await new Promise(res=>setTimeout(res,ms))}
-    if(id===mb.pat)mbWrite('0,0,0');
+    if(id===mb.pat)mbWrite(MB_BASE.join(','));   /* 終わったら、弱い光にもどる */
   })();
   mb.cur=run;return run;
 }
-const mbSend=k=>{if(k==='E')mbPlay(mbRainbow(),{after:true});else mbPlay(MB_PAT[k])};
+/* バトル終了：いまの光から、やんわり虹色に切り替わって、そのままゆっくり回り続ける（次のバトルが始まるまで） */
+async function mbRainbowLoop(){
+  if(!mbOn())return;
+  if(mb.cur){try{await mb.cur}catch{}}        /* とどめの光が終わってから */
+  const id=++mb.pat;mb.cur=null;
+  let h=0,t=0;
+  while(id===mb.pat&&mbOn()){
+    const k=Math.min(1,t/1800);                 /* 約2秒かけて、弱い光 → 虹色へ */
+    mbWrite(mbMix(MB_BASE,mbHsv(h,.75),k*k*(3-2*k)).join(','));
+    await new Promise(res=>setTimeout(res,60));
+    h=(h+3)%360;t+=60;                           /* 1周 約7秒 */
+  }
+}
+const mbSend=k=>{if(k==='E')mbRainbowLoop();else if(k==='S')mbPlay(mbFlare([0,90,255],1,600,false));else mbPlay(MB_PAT[k])};
 /* ダメージの大きさ（受けた側の最大体力にくらべて）で強さを決める */
 const mbHit=(dmg,maxHp)=>mbPlay(mbHitPat(Math.max(1,Math.min(9,Math.round(dmg/Math.max(1,maxHp)*18)))));
 function pop(i,text){
