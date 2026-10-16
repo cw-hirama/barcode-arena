@@ -1475,12 +1475,17 @@ function mbFlare(col,peak,ms,white){
   return o;
 }
 /* ダメージの強さ p＝1〜9 で、色・明るさ・光っている長さを変える
-   1〜2 黄色 → 3〜4 オレンジ → 5〜6 赤 → 7〜8 ピンク → 9 むらさき（大きいほど明るく、長く、白い芯つき） */
+   1〜2 黄色 → 3〜4 オレンジ → 5〜6 赤 → 7〜8 ピンク → 9 むらさき（大きいほど点滅が多く、長く、何発も光る） */
 function mbHitPat(p){
-  const col=mbHsv(55-p*11,1),peak=Math.min(1,.55+p*.05),ms=350+p*70;
-  let o=mbFlare(col,peak,ms,p>=6);
-  if(p>=7)o=o.concat(mbFlare(col,peak*.7,ms*.6,false));  /* とても大きいときは、もう1回 */
-  return o;
+  const col=mbHsv(55-p*11,1),ms=420+p*80,o=[];
+  /* はじめに「バチッ」：白とダメージの色を、暗い間をはさんで素早く点滅（大きいほど回数が多い） */
+  const strobe=1+(p>=3?1:0)+(p>=6?1:0)+(p>=8?1:0);
+  for(let i=0;i<strobe;i++)o.push([255,255,255,35],[...col,35],[0,0,0,30]);
+  /* そのあと「ピカーーッ」：いちばん明るく光って、じわっと弱い光にもどる */
+  let f=mbFlare(col,1,ms,false);
+  if(p>=5)f=f.concat(mbFlare(col,.85,ms*.6,true));   /* 大きいときは、白い芯つきの2発目 */
+  if(p>=8)f=f.concat(mbFlare(col,.7,ms*.45,false));  /* とても大きいときは、さらに3発目 */
+  return o.concat(f);
 }
 async function mbPlay(steps,{after=false}={}){
   if(!mbOn()||!steps)return;
