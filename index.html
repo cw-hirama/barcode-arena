@@ -494,6 +494,7 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
       <button class="sub" id="goOnline" hidden>サーバーにつないで、友だちやランキングで遊ぶ</button>
       <div class="row"><button class="sub" id="histBtn">バトル履歴</button><button class="sub" id="manBtn">たたかい方マニュアル</button></div>
       <button class="sub" id="rulesBtn">バーコードの読み方・しらべる</button>
+      <button class="sub" id="ccBtn" hidden>友だちのトレカを見る（カードコード）</button>
       <div class="mbbox" id="mbBox" hidden>
         <p class="mbstate" id="mbState" hidden><span class="mbdot"></span><span id="mbLbl">micro:bit をつなぐ</span></p>
         <div class="row"><button class="sub" id="mbUsb" hidden>micro:bit・M5Stack をUSBでつなぐ</button><button class="sub" id="mbBt" hidden>micro:bit・M5Stack をBluetoothでつなぐ</button><button class="sub" id="mbTest" hidden>光らせてみる</button><button class="sub" id="mbOff" hidden>切る</button></div>
@@ -1062,6 +1063,7 @@ $('#howBtn').onclick=()=>startTut();
 $('#rulesBtn').onclick=()=>startRules();
 $('#manBtn').onclick=()=>startManual();
 $('#histBtn').onclick=()=>startHistory();
+$('#ccBtn').hidden=!SERVER;$('#ccBtn').onclick=()=>startCardCode();
 $('#mbBox').hidden=false;
 if(!mbOk()){const m=$('#mbMsg');m.textContent=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'iPhone・iPad のブラウザは Bluetooth に対応していないことが多いです。つながらないときは、Bluefy などの Bluetooth 対応ブラウザアプリで開いてね':'このブラウザは Bluetooth に対応していないかもしれません。つながらないときは、パソコンか Android の Chrome / Edge で開いてね';m.hidden=false}
 else if(!mbUsbOk()){const m=$('#mbMsg');m.textContent='スマホは Bluetooth でつなげます（USB でつなぐのはパソコンだけ）';m.hidden=false}
@@ -2312,30 +2314,64 @@ async function renderCardScreen(f,no,imgSrc,shared){
   body.append(st,bImg,bPdf);
   body.append(h('<p class="cardnote">印刷するときは「実際のサイズ（100%）」を選ぶと、カードゲームと同じ大きさになります</p>'));
   if(!shared){
-    const link=`${SHARE_BASE}#${cardToken(f,no)}`;
-    const sh=h(`<div class="share"><h4>友だちに見せるリンク</h4>
-      <div class="lb"></div>
-      <p>このリンクを開くと、このカードが表示されます。${SERVER?'':'友だちが開けるようにするには、このゲームのページを右上の「共有」から公開しておいてね。'}${f.img||imgSrc?'自分で描いた絵はリンクには入らず、バーコードから生まれた姿で表示されます。':''}</p></div>`);
+    const tok=cardToken(f,no),longLink=`${SHARE_BASE}#${tok}`;
+    const sh=h(`<div class="share"><h4>友だちに見せる</h4>
+      <div class="cc" hidden><p style="margin:0">カードコード</p><div class="code-big"></div></div>
+      <div class="lb"><p class="small" style="margin:0">${ONLINE&&net.ready?'カードコードを作っています…':''}</p></div>
+      <p class="cnote">このリンクを開くと、このカードが表示されます。${SERVER?'':'友だちが開けるようにするには、このゲームのページを右上の「共有」から公開しておいてね。'}${f.img||imgSrc?'自分で描いた絵はリンクには入らず、バーコードから生まれた姿で表示されます。':''}</p></div>`);
     const say2=(t,ok)=>{let m=$('.lbmsg',sh);if(!m){m=h('<p class="status lbmsg"></p>');sh.append(m)}m.textContent=t;m.classList.toggle('ok',!!ok)};
-    const lb=linkBox(link,`${f.name}のトレカ`,`バーコードアリーナの「${f.name}」のトレカを見てね！`,say2);$('input',lb).id='shareLink';
-    $('.lb',sh).replaceWith(lb);
+    const putLink=link=>{const lb=linkBox(link,`${f.name}のトレカ`,`バーコードアリーナの「${f.name}」のトレカを見てね！`,say2);$('input',lb).id='shareLink';$('.lb',sh).replaceChildren(lb)};
     body.append(sh);
+    let code=null;
+    if(ONLINE&&net.ready){try{const {data,error}=await sb.rpc('share_card',{p_token:tok.slice(5)});if(!error&&typeof data==='string'&&/^[A-Z2-9]{4,6}$/.test(data))code=data}catch{}}
+    if(code){
+      $('.code-big',sh).textContent=code;$('.cc',sh).hidden=false;
+      putLink(`${SHARE_BASE}#c-${code}`);
+      $('.cnote',sh).textContent=`このリンクを開くか、ホームの「友だちのトレカを見る」にコード「${code}」を入れると、このカードが表示されます。`+(f.img||imgSrc?'自分で描いた絵は入らず、バーコードから生まれた姿で表示されます。':'');
+    }else putLink(longLink);
   }else{
     const play=h('<button class="big center">自分も遊んでみる</button>');play.onclick=()=>{try{history.replaceState(null,'',location.pathname+location.search)}catch{}cardState=null;enterGame()};body.append(play);
   }
 }
-$('#cardBack').onclick=()=>{if(cardState&&cardState.from==='done')crShow('done'),go('create');else{try{if(location.hash.startsWith('#card-'))history.replaceState(null,'',location.pathname+location.search)}catch{}home()}};
+$('#cardBack').onclick=()=>{if(cardState&&cardState.from==='done')crShow('done'),go('create');else{try{if(location.hash.startsWith('#card-')||location.hash.startsWith('#c-'))history.replaceState(null,'',location.pathname+location.search)}catch{}home()}};
 let pendingFriend=null,pendingVs=null;
 function openSharedCard(){
   const tok=location.hash.slice(1);
   if(tok.startsWith('friend-')){pendingFriend=tok.slice(7);if(ONLINE&&net.ready)startFriends();return false}
   if(tok.startsWith('vs-')){pendingVs=vsNorm(tok.slice(3));try{history.replaceState(null,'',location.pathname+location.search)}catch{}if(ONLINE&&net.ready){prep.joinCode=pendingVs;pendingVs=null;startPrep('net')}return false}
+  if(/^c-[A-Za-z0-9]{4,6}$/.test(tok)&&SERVER){openCardCode(tok.slice(2));return true}
   if(!tok.startsWith('card-'))return false;
   const c=cardFromToken(tok.slice(5));
   go('card');$('#cardTitle').textContent='とどいたトレカ';cardState={from:'shared'};
   if(!c){cardTodo('このカードのリンクは読めませんでした','リンクが途中で切れていないか確かめてね。');$('#cardBody').innerHTML='';const p=h('<button class="big center">ゲームをはじめる</button>');p.onclick=()=>enterGame();$('#cardBody').append(p);return true}
   renderCardScreen(c.f,c.no,null,true);return true;
 }
+/* カードコード（4文字）からカードを読む。ログインしていなくても読める */
+const normCardCode=c=>String(c||'').toUpperCase().replace(/[^0-9A-Z]/g,'').slice(0,6);
+async function fetchCardToken(code){
+  const r=await fetch(SB_URL+'/rest/v1/rpc/get_card',{method:'POST',headers:{apikey:CONFIG.SUPABASE_ANON_KEY.trim(),Authorization:'Bearer '+CONFIG.SUPABASE_ANON_KEY.trim(),'Content-Type':'application/json'},body:JSON.stringify({p_code:code})});
+  if(!r.ok)throw new Error('http');
+  const t=await r.json();return typeof t==='string'?t:null;
+}
+async function openCardCode(raw){
+  const code=normCardCode(raw);
+  go('card');$('#cardTitle').textContent='とどいたトレカ';cardState={from:'shared'};
+  cardTodo('カードを読みこんでいます…');$('#cardBody').innerHTML='';
+  let c=null,err=false;
+  if(/^[A-Z2-9]{4,6}$/.test(code)){try{const t=await fetchCardToken(code);c=t?cardFromToken(t):null}catch{err=true}}
+  if(c){renderCardScreen(c.f,c.no,null,true);return}
+  cardTodo(err?'サーバーにつながりませんでした':`カードコード「${esc(code)}」のカードは見つかりませんでした`,err?'電波をたしかめて、もう一度ためしてね。':'コードを見まちがえていないか確かめてね（英語の大文字と数字の4文字。まぎらわしい I・O・0・1 は使いません）。');
+  cardCodeEntry();
+}
+function cardCodeEntry(){
+  const b=$('#cardBody');
+  const box=h(`<div class="share"><h4>友だちのトレカを見る</h4><p>友だちに教えてもらった4文字のカードコードを入れてね</p><div class="entry"><label class="sr" for="ccIn">カードコード</label><input id="ccIn" autocomplete="off" autocapitalize="characters" maxlength="6" placeholder="例 K7Q4" style="text-transform:uppercase;letter-spacing:.15em;font-weight:900"><button class="chip">見る</button></div></div>`);
+  const go2=()=>{const v=normCardCode($('#ccIn',box).value);if(v.length>=4)openCardCode(v)};
+  $('.chip',box).onclick=go2;$('#ccIn',box).addEventListener('keydown',e=>{if(e.key==='Enter')go2()});
+  const play=h('<button class="sub">もどる</button>');play.onclick=()=>{try{history.replaceState(null,'',location.pathname+location.search)}catch{}cardState=null;enterGame()};
+  b.append(box,play);
+}
+function startCardCode(){go('card');$('#cardTitle').textContent='友だちのトレカを見る';cardState={from:'shared'};cardTodo('カードコードを入れてね','友だちのトレカ画面に出ている4文字のコードです。');$('#cardBody').innerHTML='';cardCodeEntry();setTimeout(()=>{try{$('#ccIn').focus()}catch{}},50)}
 function enterGame(){if(ONLINE&&net.needWelcome)return showWelcome();if(pendingVs&&ONLINE&&net.ready){prep.joinCode=pendingVs;pendingVs=null;return startPrep('net')}if(store.get('ba-tut',0)<2)startTut();else home()}
 
 /* ---------- オンライン：保存の同期 ---------- */
@@ -2378,7 +2414,7 @@ const maskMail=m=>{if(!m||!m.includes('@'))return '';const [a,d]=m.split('@');re
 const localHasData=()=>mates().length>0||player.lv>1;
 function setIntent(kind){try{localStorage.setItem('ba-auth-intent',JSON.stringify({kind,at:Date.now()}))}catch{}}
 function takeIntent(){try{const v=JSON.parse(localStorage.getItem('ba-auth-intent')||'null');localStorage.removeItem('ba-auth-intent');return v&&Date.now()-v.at<15*60e3?v.kind:null}catch{return null}}
-function cleanAuthUrl(){try{const h=location.hash.startsWith('#card-')||location.hash.startsWith('#friend-')?location.hash:'';history.replaceState(null,'',location.pathname+h)}catch{}}
+function cleanAuthUrl(){try{const h=location.hash.startsWith('#card-')||location.hash.startsWith('#c-')||location.hash.startsWith('#friend-')?location.hash:'';history.replaceState(null,'',location.pathname+h)}catch{}}
 async function googleLogin(){
   setIntent('login');
   if(net.ready)await pushSave();
