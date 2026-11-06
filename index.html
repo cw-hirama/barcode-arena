@@ -50,6 +50,10 @@ body{
   repeating-linear-gradient(90deg,#fff 0 2px,#fff0 2px 4px,#fff 4px 5px,#fff0 5px 8px) 6px 7px/18px 16px no-repeat,
   linear-gradient(135deg,var(--red),#ff8a3d);box-shadow:0 3px 0 var(--red-d)}
 .logo span{color:var(--red)}
+.hdrR{display:flex;align-items:center;gap:8px}
+.sndBtn{width:34px;height:30px;border-radius:999px;border:0;background:var(--card);color:var(--navy);font:900 16px var(--f-round);box-shadow:0 2px 0 var(--line);cursor:pointer;position:relative;padding:0}
+.sndBtn[aria-pressed="false"]{color:var(--muted)}
+.sndBtn[aria-pressed="false"]::after{content:"";position:absolute;left:7px;right:7px;top:50%;height:2.5px;background:#e5484d;transform:rotate(-40deg);border-radius:2px}
 .pill{white-space:nowrap;font-weight:800;font-size:12.5px;background:var(--card);color:var(--navy);border-radius:999px;padding:5px 12px;box-shadow:0 2px 0 var(--line)}
 
 .screen{display:flex;flex-direction:column;gap:14px}
@@ -482,7 +486,7 @@ h3{margin:0;font-weight:900;font-size:16px;letter-spacing:.02em}
   <div class="device">
     <header class="brand">
       <div class="logo"><i class="mark" aria-hidden="true"></i><div>BARCODE <span>ARENA</span></div></div>
-      <div class="pill" id="hdrLv"></div>
+      <div class="hdrR"><button class="sndBtn" id="sndBtn" aria-pressed="true" aria-label="音楽をとめる" title="音楽 ON/OFF">♪</button><div class="pill" id="hdrLv"></div></div>
     </header>
 
     <!-- HOME -->
@@ -823,6 +827,79 @@ function beep(freq=2100,len=.09){
 }
 const fanfare=()=>{beep(1600,.07);setTimeout(()=>beep(2400,.12),110)};
 
+/* ---------- 音楽（オリジナル曲。ブラウザで音を作って鳴らす） ----------
+   曲は「8分音符ごとの音の高さ（MIDI番号）」のならび。'-' は前の音をのばす、0 は休み */
+const _='-';
+const SONGS={
+  battle:{bpm:152,loop:true,steps:64,tracks:[
+    {type:'square',vol:.05,notes:[
+      69,72,76,81,79,76,72,76, 77,76,72,69,72,77,81,79, 79,74,71,67,71,74,79,81, 80,76,71,68,71,76,80,83,
+      76,_,81,_,84,_,83,81, 84,_,81,_,77,_,79,81, 83,_,79,_,74,_,76,77, 76,_,_,_,80,_,83,_]},
+    {type:'triangle',vol:.16,notes:[
+      45,57,45,57,45,57,45,57, 41,53,41,53,41,53,41,53, 43,55,43,55,43,55,43,55, 40,52,40,52,40,52,40,52,
+      45,57,45,57,45,57,45,57, 41,53,41,53,41,53,41,53, 43,55,43,55,43,55,43,55, 40,52,40,52,40,52,40,52]}],
+    drums:{k:[0,4],s:[2,6],h:[0,1,2,3,4,5,6,7]}},
+  win:{bpm:150,loop:false,steps:24,then:'calm',tracks:[
+    {type:'square',vol:.06,notes:[67,72,76,79,84,_,79,_, 84,_,_,_,86,_,88,_, 91,_,_,_,_,_,_,0]},
+    {type:'triangle',vol:.16,notes:[48,_,_,_,52,_,_,_, 53,_,_,_,55,_,_,_, 48,_,_,_,_,_,_,0]}],
+    drums:{k:[0,8,16],s:[12],h:[]}},
+  lose:{bpm:104,loop:false,steps:16,then:'calm',tracks:[
+    {type:'triangle',vol:.14,notes:[76,_,72,_,69,_,68,_, 69,_,_,_,_,_,_,0]},
+    {type:'triangle',vol:.12,notes:[45,_,_,_,41,_,_,_, 40,_,_,_,45,_,_,0]}],
+    drums:{k:[],s:[],h:[]}},
+  calm:{bpm:96,loop:true,steps:32,tracks:[
+    {type:'triangle',vol:.09,notes:[72,76,79,76,72,76,79,76, 69,72,77,72,69,72,77,72, 67,71,74,71,67,71,74,71, 72,76,79,84,79,76,72,_]},
+    {type:'triangle',vol:.1,notes:[48,_,_,_,_,_,_,_, 41,_,_,_,_,_,_,_, 43,_,_,_,_,_,_,_, 48,_,_,_,_,_,_,_]}],
+    drums:{k:[],s:[],h:[]}}
+};
+const bgm={on:(()=>{try{return localStorage.getItem('ba-bgm')!=='off'}catch{return true}})(),song:null,name:'',pos:0,next:0,timer:null,bus:null,noise:null};
+function audio(){
+  try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume().catch(()=>{})}catch{return null}
+  if(!bgm.bus){bgm.bus=actx.createGain();bgm.bus.gain.value=bgm.on?1:0;bgm.bus.connect(actx.destination)}
+  return actx;
+}
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+function bgmNote(t,m,dur,type,vol){
+  const o=actx.createOscillator(),g=actx.createGain();o.type=type;o.frequency.value=mtof(m);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.008);g.gain.setTargetAtTime(vol*.6,t+.02,.08);
+  g.gain.setTargetAtTime(0,t+Math.max(.03,dur-.03),.02);
+  o.connect(g).connect(bgm.bus);o.start(t);o.stop(t+dur+.15);
+}
+function bgmDrum(t,k){
+  if(!bgm.noise){const b=actx.createBuffer(1,actx.sampleRate*.3,actx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;bgm.noise=b}
+  if(k==='k'){const o=actx.createOscillator(),g=actx.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(40,t+.12);
+    g.gain.setValueAtTime(.35,t);g.gain.exponentialRampToValueAtTime(.001,t+.15);o.connect(g).connect(bgm.bus);o.start(t);o.stop(t+.16);return}
+  const n=actx.createBufferSource(),f=actx.createBiquadFilter(),g=actx.createGain();n.buffer=bgm.noise;
+  f.type='highpass';f.frequency.value=k==='s'?1500:7000;const v=k==='s'?.13:.035,len=k==='s'?.12:.04;
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+len);n.connect(f).connect(g).connect(bgm.bus);n.start(t);n.stop(t+len+.02);
+}
+function bgmTick(){
+  const S=bgm.song;if(!S||!actx)return;
+  const step=60/S.bpm/2;
+  while(bgm.next<actx.currentTime+.15){
+    const p=bgm.pos,t=bgm.next;
+    for(const tr of S.tracks){const m=tr.notes[p];if(typeof m==='number'&&m>0){let n=1;while(tr.notes[(p+n)%S.steps]===_&&p+n<S.steps)n++;bgmNote(t,m,n*step,tr.type,tr.vol)}}
+    const b=p%8;for(const k of['k','s','h'])if(S.drums[k].includes(b))bgmDrum(t,k);
+    bgm.next+=step;bgm.pos++;
+    if(bgm.pos>=S.steps){if(S.loop)bgm.pos=0;else{const nx=S.then;if(nx){bgm.song=SONGS[nx];bgm.name=nx;bgm.pos=0}else{bgmStop();return}}}
+  }
+}
+function bgmPlay(name){
+  if(bgm.name===name&&bgm.timer)return;
+  bgmStop();if(!audio())return;
+  bgm.song=SONGS[name];bgm.name=name;bgm.pos=0;bgm.next=actx.currentTime+.08;
+  bgm.timer=setInterval(bgmTick,25);bgmTick();
+}
+function bgmStop(){clearInterval(bgm.timer);bgm.timer=null;bgm.song=null;bgm.name=''}
+function bgmSet(on){
+  bgm.on=on;try{localStorage.setItem('ba-bgm',on?'on':'off')}catch{}
+  if(bgm.bus&&actx)bgm.bus.gain.setTargetAtTime(on?1:0,actx.currentTime,.05);
+  const b=document.getElementById('sndBtn');if(b){b.setAttribute('aria-pressed',on);b.setAttribute('aria-label',on?'音楽をとめる':'音楽を流す')}
+}
+/* スマホは、さわったあとでないと音が出ないので、さわるたびに音の準備をする */
+addEventListener('pointerdown',()=>{if(actx&&actx.state==='suspended')actx.resume().catch(()=>{})},{passive:true});
+document.addEventListener('visibilitychange',()=>{if(!actx)return;if(document.hidden)actx.suspend().catch(()=>{});else if(bgm.timer){actx.resume().catch(()=>{});bgm.next=Math.max(bgm.next,actx.currentTime+.05)}});
+
 /* scanner: 1 big camera button; number entry hidden under help */
 let sid=0;
 function scanner({label,sub,color='',trial=false,onCode}){
@@ -1024,6 +1101,7 @@ function processImage(im,mono){
 
 /* ---------- screens ---------- */
 function go(name){
+  if(name!=='battle'&&name!=='result')bgmStop();
   $$('[data-screen]').forEach(s=>s.hidden=s.dataset.screen!==name);
   window.scrollTo({top:0});
 }
@@ -1063,6 +1141,7 @@ $('#howBtn').onclick=()=>startTut();
 $('#rulesBtn').onclick=()=>startRules();
 $('#manBtn').onclick=()=>startManual();
 $('#histBtn').onclick=()=>startHistory();
+bgmSet(bgm.on);$('#sndBtn').onclick=()=>{bgmSet(!bgm.on);if(bgm.on)audio()};
 $('#ccBtn').hidden=!SERVER;$('#ccBtn').onclick=()=>startCardCode();
 $('#mbBox').hidden=false;
 if(!mbOk()){const m=$('#mbMsg');m.textContent=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'iPhone・iPad のブラウザは Bluetooth に対応していないことが多いです。つながらないときは、Bluefy などの Bluetooth 対応ブラウザアプリで開いてね':'このブラウザは Bluetooth に対応していないかもしれません。つながらないときは、パソコンか Android の Chrome / Edge で開いてね';m.hidden=false}
@@ -1641,7 +1720,7 @@ function showResult(a,act,b){
   c.append(h(`<div class="res"><span class="rl">けっか</span>${L.map(t=>`<span>${t}</span>`).join('')}</div>`));
 }
 async function finish(w){
-  bs.over=true;bs.busy=false;refresh();mbSend('E');
+  bs.over=true;bs.busy=false;refresh();mbSend('E');bgmPlay(w===0?'win':'lose');
   {const t=`${F[1-w].name}はたおれた…`;if(bs.logs.at(-1)!==t)log(t)}
   bScan.setOff(true);$('#basicBtn').disabled=true;
   todo($('#batTodo'),'勝負あり！');
@@ -1691,7 +1770,7 @@ function startBattle(){
   $('#vsBanner').hidden=true;
   buildBatCtl();$('#actCard').hidden=true;
   bs.dial=dialEl('battle');$('#batDial').replaceChildren(bs.dial);
-  go('battle');mbSend('S');
+  go('battle');mbSend('S');bgmPlay('battle');
   F.forEach((f,i)=>drawSprite($('#f'+i+' .bsprite'),f,innerWidth<440?104:132));
   const t0=F[0].jobKey==='thief',t1=F[1].jobKey==='thief';
   bs.turn=Math.random()<(t0&&!t1?.75:t1&&!t0?.25:.5)?0:1;
@@ -1839,7 +1918,7 @@ function vsApplyState(m){
     Object.assign(bs,{over:false,busy:false,anim:false,logs:[],used:new Set([F[0].code,F[1].code]),best:{dmg:0,name:''},myMoves:0,oppNick:((vsPeer()||{}).nick||'')});vs.lastActNo=0;vs.act=null;
     buildBatCtl();$('#actCard').hidden=true;$('#vsBanner').hidden=true;
     bs.dial=dialEl('battle');$('#batDial').replaceChildren(bs.dial);
-    go('battle');mbSend('S');F.forEach((f,i)=>drawSprite($('#f'+i+' .bsprite'),f,innerWidth<440?104:132));
+    go('battle');mbSend('S');bgmPlay('battle');F.forEach((f,i)=>drawSprite($('#f'+i+' .bsprite'),f,innerWidth<440?104:132));
   }else{
     /* ダメージや回復を表示してから、新しい数値にする */
     nf.forEach((f,i)=>{const d=f.hp-F[i].hp;if(i===1&&d<0&&vs.act&&vs.act.a===0&&bs.best&&-d>bs.best.dmg)bs.best={dmg:-d,name:vs.act.act.name};if(d<0){pop(i,String(d));const fld=$('#field');fld.classList.remove('shake');void fld.offsetWidth;fld.classList.add('shake');try{navigator.vibrate&&navigator.vibrate(40)}catch{}}else if(d>0)pop(i,'+'+d);
