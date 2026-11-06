@@ -1522,6 +1522,10 @@ function pop(i,text){
   const sp=$('.bsprite',box);sp.classList.remove('hit');void sp.offsetWidth;sp.classList.add('hit');
 }
 const EVADE={sword:.12,thief:.16};
+/* バランス調整：ダメージ全体の強さ／CPUの強さ／長引いたときに攻撃が強くなる */
+const BAL={dmg:1.3,cpuHp:.85,cpuSt:.88,cpuGrow:.8,longFrom:6,longStep:.2};
+const roundNo=()=>Math.ceil((bs.turnNo||1)/2);
+const longBoost=()=>Math.max(0,roundNo()-BAL.longFrom)*BAL.longStep;
 const CRIT={monk:.25,hunter:.15};
 async function hit(a,d,{mult=1,defF=.5,sure=false,magic=false}={}){
   const A=F[a],D=F[d];
@@ -1530,7 +1534,7 @@ async function hit(a,d,{mult=1,defF=.5,sure=false,magic=false}={}){
   if(magic)mult*=A.jobKey==='mage'?1.3:A.jobKey==='sage'?1.2:1;
   const st=A.st*(A.jobKey==='dragoon'&&A.hp<A.maxHp*.3?1.3:1);
   let dmg=st*mult*rnd(.9,1.1)-D.df*defF;
-  dmg=Math.max(dmg,st*.12*mult);
+  dmg=Math.max(dmg,st*.12*mult)*BAL.dmg*(1+longBoost());
   const crit=Math.random()<(CRIT[A.jobKey]??.1);if(crit)dmg*=1.7;
   if(D.guard)dmg*=D.jobKey==='knight'?Math.min(.25,D.guard):D.guard;
   dmg=Math.round(dmg);D.hp-=dmg;
@@ -1559,6 +1563,7 @@ function showAct(act,who){
 }
 async function turnStart(i){
   const f=F[i];f.guard=false;
+  if(i===0&&roundNo()===BAL.longFrom+1){log('バトルが長引いてきた！ ここから攻撃がどんどん強くなる');await wait(500)}
   if(f.jobKey==='priest'&&f.hp<f.maxHp){const x=heal(i,f.maxHp*.04);if(x){log(`${f.name}の祈りで体力が${x}回復`);await wait(450)}}
 }
 function discoverMove(act){
@@ -1666,7 +1671,7 @@ async function finish(w){
   go('result');
 }
 function cpuLevelUp(f,lv){
-  for(let l=f.lv;l<lv;l++){const rate=.08/(1+(l-1)*.04)*rnd(.8,1.3);f.maxHp+=ten(2700*rate);f.st+=ten(650*rate);f.df+=ten(320*rate)}
+  for(let l=f.lv;l<lv;l++){const rate=.08/(1+(l-1)*.04)*rnd(.8,1.3)*BAL.cpuGrow;f.maxHp+=ten(2700*rate);f.st+=ten(650*rate);f.df+=ten(320*rate)}
   f.lv=Math.max(f.lv,lv);f.hp=f.maxHp;
 }
 function prepF(src){return{...src,hp:src.maxHp,baseSt:src.st,guard:false}}
@@ -1681,6 +1686,7 @@ function startBattle(){
   if(bs.mode==='net'){bs.peerSid=vsPeer().sid;bs.bid=vs.sid+'-'+Date.now().toString(36)}
   F[0]=prepF(fighter(prep.u[0]));F[1]=prepF(fighter(prep.u[1]));
   if(bs.mode==='cpu'&&F[1].lv<F[0].lv){cpuLevelUp(F[1],F[0].lv);F[1].baseSt=F[1].st}
+  if(bs.mode==='cpu'){F[1].maxHp=F[1].hp=ten(F[1].maxHp*BAL.cpuHp);F[1].st=F[1].baseSt=ten(F[1].st*BAL.cpuSt)}
   Object.assign(bs,{over:false,busy:false,anim:false,turnNo:1,logs:[],used:new Set([F[0].code,F[1].code]),best:{dmg:0,name:''},myMoves:0,oppNick:bs.mode==='net'?((vsPeer()||{}).nick||''):'CPU'});
   $('#vsBanner').hidden=true;
   buildBatCtl();$('#actCard').hidden=true;
